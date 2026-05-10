@@ -11,7 +11,9 @@
   // layout Prisma’s loader `readAll`s at runtime. `scripts/prune-prisma-worker-wasm.mjs` removes unused
   // `query_engine_bg.*` after build so only the compiler WASM is present and the bundle stays small.
   // @see https://developers.cloudflare.com/workers/wrangler/configuration/#find-additional-modules
-  "find_additional_modules": true,
+  // `true` can register the same `.wasm` twice (import + scan) and Wrangler may ignore one,
+  // leaving Prisma’s Node `readAll('/bundle/node_modules/.prisma/client/query_compiler_bg.wasm')` broken.
+  "find_additional_modules": false,
   "rules": [
     {
       "type": "CompiledWasm",
