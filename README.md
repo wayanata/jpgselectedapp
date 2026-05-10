@@ -38,9 +38,11 @@ Web app for photography workflows: **customers** sign in with Google, browse **G
 
 ## Deploy to Cloudflare Workers
 
-This app uses the [**OpenNext Cloudflare**](https://opennext.js.org/cloudflare) adapter. **`npx wrangler deploy` by itself will always fail** until `.open-next/` exists. That folder is created only by **`npm run build:cloudflare`** (OpenNext), not by `next build` alone.
+This app uses the [**OpenNext Cloudflare**](https://opennext.js.org/cloudflare) adapter. The `.open-next/` folder is created by **`npm run build:cloudflare`** (OpenNext), not by `next build` alone.
 
-Your build log showed **only** the deploy step (`Executing user deploy command: npx wrangler deploy`) with **no** OpenNext build — that produces the error *Could not detect a directory containing static files*.
+**`wrangler.jsonc` includes `build.command`** so a plain **`npx wrangler deploy`** (after **`npm ci`** / **`npm install`**) runs **`npm run build:cloudflare` first**, then uploads the Worker and assets. Without dependencies installed, deploy cannot build.
+
+If an older log showed only `npx wrangler deploy` and *Could not detect a directory containing static files*, that was from **before** this `build` block existed, or from an environment that never ran `npm install`.
 
 ### Workers Builds settings (pick one)
 
