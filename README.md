@@ -51,15 +51,16 @@ This app uses the [**OpenNext Cloudflare**](https://opennext.js.org/cloudflare) 
 
 **Important:** Plain **`npx wrangler deploy`** often fails on OpenNext projects: Wrangler detects OpenNext and jumps straight to **`opennextjs-cloudflare deploy`** **without** running `wrangler.jsonc`’s `build` step, which triggers *Could not find compiled Open Next config* when `.open-next/` was never built.
 
-Use **`npm run deploy`** (build first, then **`npx opennextjs-cloudflare deploy`**). Do **not** set the deploy command to **`npx wrangler deploy`** alone.
+Use **`npm run deploy:full`** to build then upload, or run **`npm run build:cloudflare`** in one CI step and **`npm run deploy`** in the next (deploy only runs **`npx opennextjs-cloudflare deploy`**). Do **not** set the deploy command to **`npx wrangler deploy`** alone.
 
-If you compose your own shell command for Cloudflare (instead of `npm run deploy`), always invoke the CLI with **`npx`** (e.g. **`npx opennextjs-cloudflare deploy`**). A bare **`opennextjs-cloudflare`** is not on `PATH` in Workers Builds.
+If you compose your own shell command for Cloudflare, always invoke the CLI with **`npx`** (e.g. **`npx opennextjs-cloudflare deploy`**). A bare **`opennextjs-cloudflare`** is not on `PATH` in Workers Builds.
 
 **Option A — recommended (two steps in Cloudflare)**
 
 | Step | Command |
 |------|---------|
 | Install | `npm ci` |
+| Build | **`npm run build:cloudflare`** |
 | Deploy | **`npx prisma migrate deploy && npm run deploy`** |
 
 Run **`prisma migrate deploy`** once per new migration (same `DATABASE_URL` as the Worker).
@@ -70,9 +71,11 @@ Run **`prisma migrate deploy`** once per new migration (same `DATABASE_URL` as t
 npm run deploy:cf
 ```
 
-(`deploy:cf` runs `npm ci` then `npm run deploy` — add **`npx prisma migrate deploy &&`** in Cloudflare if you need migrations on every deploy.)
+(`deploy:cf` runs `npm ci`, **`build:cloudflare`**, then **`deploy`**.)
 
-**Advanced:** `npm run deploy:wrangler` runs the build then **`wrangler deploy`** (same artifact layout; Wrangler may still delegate to OpenNext under the hood after the build exists).
+**Advanced:** **`npm run deploy:wrangler:full`** builds then **`wrangler deploy`**; **`npm run deploy:wrangler`** uploads only (expects `.open-next/` already built).
+
+**Worker size (Free tier):** Cloudflare counts the Worker **gzipped** bundle against a **3 MiB** limit. This repo drops unused Prisma **`query_engine_bg.wasm`** after OpenNext (`scripts/prune-prisma-worker-wasm.mjs`) and avoids the **`googleapis`** client in favor of small **`fetch`** calls to Drive so the bundle stays under that cap.
 
 1. **Wrangler config** is committed as `wrangler.jsonc` (`main`: `.open-next/worker.js`, `assets`: `.open-next/assets`). It sets **`find_additional_modules`** and a **`CompiledWasm`** rule so Prisma’s **`query_compiler_bg.wasm`** is uploaded with the Worker (see [Wrangler: find additional modules](https://developers.cloudflare.com/workers/wrangler/configuration/#find-additional-modules)).
 2. **Variables and secrets** on the Worker: `DATABASE_URL` (Postgres), `AUTH_USE_PRISMA_ADAPTER=1`, `AUTH_SECRET`, `AUTH_URL`, Google OAuth IDs/secrets, etc.  
