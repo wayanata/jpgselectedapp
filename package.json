@@ -5,7 +5,7 @@
   "scripts": {
     "dev": "next dev",
     "build": "prisma generate && next build --webpack",
-    "build:cloudflare": "prisma generate && npx opennextjs-cloudflare build && node scripts/strip-sourcemaps.mjs && node scripts/prune-prisma-worker-wasm.mjs",
+    "build:cloudflare": "prisma generate && npx opennextjs-cloudflare build && node scripts/strip-sourcemaps.mjs && node scripts/prune-prisma-worker-wasm.mjs && node scripts/assert-wrangler-prisma-wasm.mjs",
     "deploy": "npx opennextjs-cloudflare deploy && node scripts/rm-next-webpack-cache.mjs",
     "deploy:full": "npm run build:cloudflare && npm run deploy",
     "deploy:wrangler": "wrangler deploy && node scripts/rm-next-webpack-cache.mjs",
