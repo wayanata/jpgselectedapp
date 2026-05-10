@@ -6,6 +6,17 @@
   "main": ".open-next/worker.js",
   "compatibility_date": "2026-05-10",
   "compatibility_flags": ["nodejs_compat"],
+  // Prisma `engineType = "client"` loads `query_compiler_bg.wasm` from `.open-next/**/node_modules/.prisma/client/`.
+  // Without this, runtime fails: readAll '/bundle/node_modules/.prisma/client/query_compiler_bg.wasm'
+  // @see https://developers.cloudflare.com/workers/wrangler/configuration/#find-additional-modules
+  "find_additional_modules": true,
+  "rules": [
+    {
+      "type": "CompiledWasm",
+      "globs": ["**/*.wasm"],
+      "fallthrough": true
+    }
+  ],
   "assets": {
     "directory": ".open-next/assets",
     "binding": "ASSETS"

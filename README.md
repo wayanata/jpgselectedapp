@@ -25,6 +25,7 @@ Web app for photography workflows: **photographers** sign in with Google once, a
    - `DATABASE_URL` — your Postgres URL (`?sslmode=require` for Neon).
    - `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` (or `AUTH_GOOGLE_ID` / `AUTH_GOOGLE_SECRET`).
    - `AUTH_SECRET` — run `openssl rand -base64 32`.
+   - `AUTH_USE_PRISMA_ADAPTER=1` — required for Postgres-backed Auth.js sessions (local + Worker); omit in CI so `next build` never opens the DB for auth.
    - `AUTH_URL` / `NEXTAUTH_URL` — e.g. `http://localhost:3000` for local development.
 
 5. **Install and migrate**
@@ -50,7 +51,9 @@ This app uses the [**OpenNext Cloudflare**](https://opennext.js.org/cloudflare) 
 
 **Important:** Plain **`npx wrangler deploy`** often fails on OpenNext projects: Wrangler detects OpenNext and jumps straight to **`opennextjs-cloudflare deploy`** **without** running `wrangler.jsonc`’s `build` step, which triggers *Could not find compiled Open Next config* when `.open-next/` was never built.
 
-Use **`npm run deploy`** (build first, then **`opennextjs-cloudflare deploy`**). Do **not** set the deploy command to **`npx wrangler deploy`** alone.
+Use **`npm run deploy`** (build first, then **`npx opennextjs-cloudflare deploy`**). Do **not** set the deploy command to **`npx wrangler deploy`** alone.
+
+If you compose your own shell command for Cloudflare (instead of `npm run deploy`), always invoke the CLI with **`npx`** (e.g. **`npx opennextjs-cloudflare deploy`**). A bare **`opennextjs-cloudflare`** is not on `PATH` in Workers Builds.
 
 **Option A — recommended (two steps in Cloudflare)**
 
@@ -71,10 +74,11 @@ npm run deploy:cf
 
 **Advanced:** `npm run deploy:wrangler` runs the build then **`wrangler deploy`** (same artifact layout; Wrangler may still delegate to OpenNext under the hood after the build exists).
 
-1. **Wrangler config** is committed as `wrangler.jsonc` (`main`: `.open-next/worker.js`, `assets`: `.open-next/assets`).
-2. **Variables and secrets** on the Worker: `DATABASE_URL` (Postgres), `AUTH_SECRET`, `AUTH_URL`, Google OAuth IDs/secrets, etc.
+1. **Wrangler config** is committed as `wrangler.jsonc` (`main`: `.open-next/worker.js`, `assets`: `.open-next/assets`). It sets **`find_additional_modules`** and a **`CompiledWasm`** rule so Prisma’s **`query_compiler_bg.wasm`** is uploaded with the Worker (see [Wrangler: find additional modules](https://developers.cloudflare.com/workers/wrangler/configuration/#find-additional-modules)).
+2. **Variables and secrets** on the Worker: `DATABASE_URL` (Postgres), `AUTH_USE_PRISMA_ADAPTER=1`, `AUTH_SECRET`, `AUTH_URL`, Google OAuth IDs/secrets, etc.  
+   If the **Workers build** step still fails on `/api/auth`, ensure `AUTH_USE_PRISMA_ADAPTER` is **not** duplicated into **Build environment variables** (runtime-only is fine). The app reads these via runtime `process.env` so compile-time inlining does not force the Prisma adapter during `next build`.
 
-Prisma uses **`engineType = "client"`** plus **`@prisma/adapter-neon`** with **HTTP** (`PrismaNeonHTTP`) so the Worker bundle does not need the native query-engine `.node` binary (see `src/lib/prisma.ts`). Use a Neon connection string; a **pooler** hostname (`-pooler` in the host) is recommended for serverless.
+Prisma uses **`engineType = "client"`** plus **`@prisma/adapter-neon`** with **HTTP** (`PrismaNeonHTTP`) so the Worker bundle does not need the native query-engine `.node` binary (see `src/lib/prisma.ts`). **`next.config.ts`** lists **`serverExternalPackages`** for `@prisma/client` / `.prisma/client` / `@prisma/adapter-neon` so OpenNext can bundle the **workerd** build of Prisma (see [OpenNext DB how-to](https://opennext.js.org/cloudflare/howtos/db)). Use a Neon connection string; a **pooler** hostname (`-pooler` in the host) is recommended for serverless.
 
 **Cloudflare Pages asset limit:** each uploaded file must be **≤ 25 MiB**. Large production source maps under `.next/` used to break deploys; this repo builds with **`next build --webpack`** (no production source maps) and runs **`scripts/strip-sourcemaps.mjs`** after OpenNext to delete any leftover `*.map` files.
 
