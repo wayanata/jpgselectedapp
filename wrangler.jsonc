@@ -1,5 +1,7 @@
 {
   "$schema": "./node_modules/wrangler/config-schema.json",
+  // Required when using an Account API token (cannot call /memberships). Override via CLOUDFLARE_ACCOUNT_ID in CI if needed.
+  "account_id": "463b731f212d49e8c718da667bdba1ca",
   "name": "jpgselectedapp",
   "main": ".open-next/worker.js",
   "compatibility_date": "2026-05-10",

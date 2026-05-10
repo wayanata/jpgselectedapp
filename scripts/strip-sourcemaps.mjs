@@ -1,8 +1,8 @@
 /**
- * Cloudflare Pages rejects static assets over 25 MiB. Next/OpenNext can emit
- * large server .map files; remove them before Pages validates the output.
+ * Cloudflare Pages / Workers Builds validates output dirs with a 25 MiB cap per file.
+ * Strip server .map files and remove webpack disk cache (e.g. .next/cache/.../0.pack).
  */
-import { readdir, unlink } from "node:fs/promises";
+import { readdir, rm, unlink } from "node:fs/promises";
 import { join } from "node:path";
 
 const roots = [".open-next", ".next"];
@@ -22,3 +22,7 @@ async function walk(dir) {
 }
 
 for (const r of roots) await walk(r);
+
+await rm(join(process.cwd(), ".next/cache"), { recursive: true, force: true }).catch(
+  () => {},
+);
