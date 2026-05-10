@@ -21,6 +21,9 @@
 # production
 /build
 
+# prisma local db
+/prisma/*.db
+
 # misc
 .DS_Store
 *.pem
