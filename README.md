@@ -38,13 +38,33 @@ Web app for photography workflows: **customers** sign in with Google, browse **G
 
 ## Deploy to Cloudflare Workers
 
-This app uses the [**OpenNext Cloudflare**](https://opennext.js.org/cloudflare) adapter. `npx wrangler deploy` alone fails until `.open-next/` exists — that output is created by the OpenNext build, not by `next build` alone.
+This app uses the [**OpenNext Cloudflare**](https://opennext.js.org/cloudflare) adapter. **`npx wrangler deploy` by itself will always fail** until `.open-next/` exists. That folder is created only by **`npm run build:cloudflare`** (OpenNext), not by `next build` alone.
+
+Your build log showed **only** the deploy step (`Executing user deploy command: npx wrangler deploy`) with **no** OpenNext build — that produces the error *Could not detect a directory containing static files*.
+
+### Workers Builds settings (pick one)
+
+**Option A — separate build + deploy (recommended)**
+
+| Step | Command |
+|------|---------|
+| Install / build | `npm ci && npm run build:cloudflare` |
+| Deploy | `npx wrangler deploy` |
+
+**Option B — single command** (use if your project only runs **one** custom command before/instead of a separate build step)
+
+```bash
+npm run deploy:cf
+```
+
+That script runs `npm ci`, then `build:cloudflare`, then `wrangler deploy`. Equivalent one-liner:
+
+```bash
+npm ci && npm run build:cloudflare && npx wrangler deploy
+```
 
 1. **Wrangler config** is committed as `wrangler.jsonc` (`main`: `.open-next/worker.js`, `assets`: `.open-next/assets`).
-2. In **Workers Builds** (or your CI), set:
-   - **Build command:** `npm run build:cloudflare` (runs `prisma generate` + `opennextjs-cloudflare build`).
-   - **Deploy command:** `npx wrangler deploy` (or use **`npm run deploy`**, which builds then deploys in one step).
-3. Add the same env vars as locally (`AUTH_SECRET`, `DATABASE_URL`, Google OAuth, `NEXTAUTH_URL` / `AUTH_URL` for your production URL) in the dashboard under **Build variables and secrets**.
+2. Add the same env vars as locally (`AUTH_SECRET`, `DATABASE_URL`, Google OAuth, `NEXTAUTH_URL` / `AUTH_URL` for your production URL) in the dashboard under **Build variables and secrets**.
 
 SQLite (`file:./dev.db`) does not run on Workers. For production on Cloudflare you will need a hosted database (for example **Neon** PostgreSQL, **Turso** with Prisma’s driver adapter, or **D1** with the Prisma D1 adapter) and a matching `DATABASE_URL` / adapter setup.
 

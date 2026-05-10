@@ -4,9 +4,10 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
-    "build": "prisma generate && next build",
-    "build:cloudflare": "prisma generate && opennextjs-cloudflare build",
+    "build": "prisma generate && next build --webpack",
+    "build:cloudflare": "prisma generate && opennextjs-cloudflare build && node scripts/strip-sourcemaps.mjs",
     "deploy": "npm run build:cloudflare && wrangler deploy",
+    "deploy:cf": "npm ci && npm run build:cloudflare && wrangler deploy",
     "preview:cloudflare": "opennextjs-cloudflare build && opennextjs-cloudflare preview",
     "cf-typegen": "wrangler types --env-interface CloudflareEnv cloudflare-env.d.ts",
     "start": "next start",
