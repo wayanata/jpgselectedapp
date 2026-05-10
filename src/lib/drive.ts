@@ -31,12 +31,63 @@ export async function getDriveClient(userId: string) {
   return google.drive({ version: "v3", auth: oauth2Client });
 }
 
+/** Walk parents until rootFolderId — ensures folderId lives under the job folder tree. */
+export async function isFolderUnderRoot(
+  drive: ReturnType<typeof google.drive>,
+  folderId: string,
+  rootFolderId: string
+): Promise<boolean> {
+  let current: string | undefined = folderId;
+  const seen = new Set<string>();
+  while (current && !seen.has(current)) {
+    seen.add(current);
+    if (current === rootFolderId) return true;
+    const meta = (await drive.files.get({
+      fileId: current,
+      fields: "parents",
+      supportsAllDrives: true,
+    })) as { data: { parents?: string[] | null } };
+    const parents = meta.data.parents ?? [];
+    if (parents.includes(rootFolderId)) return true;
+    if (parents.length === 0) return false;
+    current = parents[0];
+  }
+  return false;
+}
+
 export async function listDriveChildren(
   userId: string,
   folderId: string,
   pageToken?: string
 ) {
   const drive = await getDriveClient(userId);
+  const res = await drive.files.list({
+    q: `'${folderId}' in parents and trashed = false`,
+    fields:
+      "nextPageToken, files(id, name, mimeType, thumbnailLink, webViewLink, iconLink, size)",
+    pageSize: 60,
+    pageToken,
+    supportsAllDrives: true,
+    includeItemsFromAllDrives: true,
+    orderBy: "folder,name_natural",
+  });
+  return res.data;
+}
+
+/** List children only when folderId is under rootFolderId (photographer’s Drive). */
+export async function listDriveChildrenScoped(
+  photographerUserId: string,
+  rootFolderId: string,
+  folderId: string,
+  pageToken?: string
+) {
+  const drive = await getDriveClient(photographerUserId);
+  const allowed =
+    folderId === rootFolderId ||
+    (await isFolderUnderRoot(drive, folderId, rootFolderId));
+  if (!allowed) {
+    throw new Error("Folder is outside this job’s Drive folder.");
+  }
   const res = await drive.files.list({
     q: `'${folderId}' in parents and trashed = false`,
     fields:

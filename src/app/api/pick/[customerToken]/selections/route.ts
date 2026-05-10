@@ -1,5 +1,4 @@
 import { NextResponse } from "next/server";
-import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 
 type IncomingFile = {
@@ -13,21 +12,19 @@ type IncomingFile = {
 
 export async function PUT(
   req: Request,
-  ctx: { params: Promise<{ jobId: string }> }
+  ctx: { params: Promise<{ customerToken: string }> }
 ) {
-  const session = await auth();
-  if (!session?.user?.id) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
+  const { customerToken } = await ctx.params;
 
-  const { jobId } = await ctx.params;
-
-  const job = await prisma.job.findFirst({
-    where: { id: jobId, customerId: session.user.id },
+  const job = await prisma.job.findUnique({
+    where: { customerToken },
+    select: { id: true },
   });
   if (!job) {
     return NextResponse.json({ error: "Job not found" }, { status: 404 });
   }
+
+  const jobId = job.id;
 
   let files: IncomingFile[] = [];
   try {

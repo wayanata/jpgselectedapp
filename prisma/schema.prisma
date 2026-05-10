@@ -36,14 +36,17 @@ model Session {
 }
 
 model User {
-  id            String    @id @default(cuid())
-  name          String?
-  email         String?   @unique
-  emailVerified DateTime?
-  image         String?
-  accounts      Account[]
-  sessions      Session[]
-  jobs          Job[]
+  id               String    @id @default(cuid())
+  name             String?
+  email            String?   @unique
+  emailVerified    DateTime?
+  image            String?
+  accounts         Account[]
+  sessions         Session[]
+  /// Legacy: old jobs created when the customer signed in with Google
+  customerJobs     Job[]     @relation("JobCustomer")
+  /// Jobs whose Drive folder is browsed using this user’s Google tokens
+  photographerJobs Job[]     @relation("JobPhotographer")
 }
 
 model VerificationToken {
@@ -57,11 +60,23 @@ model VerificationToken {
 model Job {
   id          String         @id @default(cuid())
   title       String         @default("Selections")
+  /// Secret segment for photographer board `/p/[slug]`
   slug        String         @unique
+  /// Secret segment for client picker `/pick/[customerToken]` (no Google login)
+  customerToken String       @unique
+  /// Root Google Drive folder for this job (files must stay under this tree)
+  driveFolderId String
+
   createdAt   DateTime       @default(now())
   updatedAt   DateTime       @updatedAt
+
+  photographerId String
+  photographer   User        @relation("JobPhotographer", fields: [photographerId], references: [id], onDelete: Cascade)
+
+  /// Deprecated: only present on legacy rows from the old customer-sign-in flow
   customerId  String?
-  customer    User?          @relation(fields: [customerId], references: [id], onDelete: SetNull)
+  customer    User?          @relation("JobCustomer", fields: [customerId], references: [id], onDelete: SetNull)
+
   folders     Folder[]
   selections  SelectedFile[]
 }
@@ -77,11 +92,11 @@ model Folder {
 }
 
 model SelectedFile {
-  id             String  @id @default(cuid())
+  id             String   @id @default(cuid())
   jobId          String
-  job            Job     @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  job            Job      @relation(fields: [jobId], references: [id], onDelete: Cascade)
   folderId       String?
-  folder         Folder? @relation(fields: [folderId], references: [id], onDelete: SetNull)
+  folder         Folder?  @relation(fields: [folderId], references: [id], onDelete: SetNull)
   driveFileId    String
   name           String
   mimeType       String?

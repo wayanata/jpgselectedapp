@@ -34,9 +34,13 @@ function isImage(mime?: string | null) {
   return !!mime?.startsWith("image/");
 }
 
-export function JobWorkspace({ jobId }: { jobId: string }) {
+export function JobWorkspace({ customerToken }: { customerToken: string }) {
+  const [rootFolderId, setRootFolderId] = useState<string | null>(null);
   const [crumbs, setCrumbs] = useState<Crumb[]>([]);
-  const folderId = crumbs.length ? crumbs[crumbs.length - 1].id : "root";
+  const folderId =
+    crumbs.length && rootFolderId
+      ? crumbs[crumbs.length - 1].id
+      : rootFolderId ?? "";
 
   const [listToken, setListToken] = useState<string | undefined>();
   const [entries, setEntries] = useState<DriveEntry[]>([]);
@@ -55,11 +59,12 @@ export function JobWorkspace({ jobId }: { jobId: string }) {
   const loadJob = useCallback(async () => {
     setLoadingJob(true);
     try {
-      const res = await fetch(`/api/jobs/${jobId}`);
+      const res = await fetch(`/api/pick/${customerToken}/job`);
       if (!res.ok) throw new Error("Could not load job");
       const data = await res.json();
       setJobTitle(data.job.title);
       setPhotographerUrl(data.photographerUrl);
+      setRootFolderId(data.driveFolderId);
       const next: SelectedMap = {};
       for (const s of data.job.selections ?? []) {
         next[s.driveFileId] = {
@@ -77,21 +82,22 @@ export function JobWorkspace({ jobId }: { jobId: string }) {
     } finally {
       setLoadingJob(false);
     }
-  }, [jobId]);
+  }, [customerToken]);
 
   useEffect(() => {
-    const t = setTimeout(() => {
-      void loadJob();
-    }, 0);
-    return () => clearTimeout(t);
+    void loadJob();
   }, [loadJob]);
 
   const fetchPage = useCallback(
     async (token?: string) => {
+      if (!rootFolderId || !folderId) return;
       setLoadingDrive(true);
       setDriveError(null);
       try {
-        const params = new URLSearchParams({ folderId });
+        const params = new URLSearchParams({
+          jobToken: customerToken,
+          folderId,
+        });
         if (token) params.set("pageToken", token);
         const res = await fetch(`/api/drive/browse?${params}`);
         const data = await res.json();
@@ -105,17 +111,15 @@ export function JobWorkspace({ jobId }: { jobId: string }) {
         setLoadingDrive(false);
       }
     },
-    [folderId]
+    [customerToken, folderId, rootFolderId]
   );
 
   useEffect(() => {
-    const t = setTimeout(() => {
-      setEntries([]);
-      setListToken(undefined);
-      void fetchPage();
-    }, 0);
-    return () => clearTimeout(t);
-  }, [folderId, fetchPage]);
+    if (!rootFolderId) return;
+    setEntries([]);
+    setListToken(undefined);
+    void fetchPage();
+  }, [folderId, rootFolderId, fetchPage]);
 
   const visibleEntries = useMemo(() => {
     return entries.filter((e) => {
@@ -134,7 +138,7 @@ export function JobWorkspace({ jobId }: { jobId: string }) {
     setSaveMsg(null);
     try {
       const files = Object.values(selected);
-      const res = await fetch(`/api/jobs/${jobId}/selections`, {
+      const res = await fetch(`/api/pick/${customerToken}/selections`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ files }),
@@ -183,16 +187,15 @@ export function JobWorkspace({ jobId }: { jobId: string }) {
       <div className="flex flex-wrap items-start justify-between gap-6">
         <div>
           <Link
-            href="/customer"
+            href="/"
             className="text-sm text-zinc-500 hover:text-zinc-300"
           >
-            ← Back to dashboard
+            ← Home
           </Link>
           <h1 className="mt-3 text-2xl font-semibold text-white">{jobTitle}</h1>
           <p className="mt-2 max-w-xl text-sm text-zinc-400">
-            Open folders to find images. Click a thumbnail to add or remove it
-            from your selection, then save. Share the photographer link when you
-            are ready.
+            Browse the gallery folder your photographer set up. Tap thumbnails to
+            select images, then save. No Google sign-in required on your side.
           </p>
         </div>
         <div className="flex flex-col items-end gap-2">
@@ -213,7 +216,7 @@ export function JobWorkspace({ jobId }: { jobId: string }) {
       {photographerUrl && (
         <div className="mt-8 rounded-xl border border-zinc-800 bg-zinc-900/50 p-4">
           <p className="text-xs font-medium uppercase tracking-wide text-zinc-500">
-            Photographer link
+            Photographer review link
           </p>
           <div className="mt-2 flex flex-wrap items-center gap-2">
             <code className="break-all rounded-lg bg-zinc-950 px-3 py-2 text-sm text-amber-200/90">
@@ -229,6 +232,10 @@ export function JobWorkspace({ jobId }: { jobId: string }) {
               Copy
             </button>
           </div>
+          <p className="mt-2 text-xs text-zinc-500">
+            Send this to your photographer when you&apos;re ready — they sort picks
+            without needing your Google account.
+          </p>
         </div>
       )}
 
@@ -239,7 +246,7 @@ export function JobWorkspace({ jobId }: { jobId: string }) {
           className="text-sm text-amber-400/90 hover:underline"
           onClick={() => setCrumbs([])}
         >
-          My Drive
+          Gallery folder
         </button>
         {crumbs.map((c, i) => (
           <span key={c.id} className="flex items-center gap-2 text-sm">
@@ -270,7 +277,7 @@ export function JobWorkspace({ jobId }: { jobId: string }) {
           Hide non-images in this folder
         </label>
         {loadingDrive && (
-          <span className="text-sm text-zinc-600">Loading Drive…</span>
+          <span className="text-sm text-zinc-600">Loading…</span>
         )}
       </div>
 

@@ -8,34 +8,35 @@ export default function HomePage() {
           Drive selections
         </p>
         <h1 className="mt-2 text-3xl font-semibold tracking-tight text-white sm:text-4xl">
-          Choose photos from Google Drive. Your photographer sees the same list.
+          Clients pick from your Drive folder. You review on a private board.
         </h1>
         <p className="mt-4 text-lg leading-relaxed text-zinc-400">
-          Customers sign in, browse their Drive, and mark images for editing.
-          Photographers open a private link to review picks and sort them into
-          folders for workflow — without needing access to the customer&apos;s
-          Drive (links open in Google when allowed).
+          You (the photographer) sign in once and paste a Drive folder link per
+          job. Your client gets a simple link — no Google login on their side —
+          browses that folder, and their picks show up for you on a separate
+          photographer link.
         </p>
       </div>
 
       <div className="grid gap-4 sm:grid-cols-2">
         <Link
-          href="/customer"
+          href="/studio"
           className="group rounded-2xl border border-zinc-800 bg-zinc-900/50 p-6 transition hover:border-amber-500/40 hover:bg-zinc-900"
         >
           <h2 className="text-lg font-medium text-white group-hover:text-amber-200">
-            I&apos;m selecting photos
+            I&apos;m the photographer
           </h2>
           <p className="mt-2 text-sm text-zinc-400">
-            Sign in with Google and create a selection set from your Drive.
+            Sign in with Google (your Drive), create a job with a folder link,
+            then share the client pick link.
           </p>
         </Link>
         <div className="rounded-2xl border border-zinc-800 bg-zinc-900/30 p-6">
-          <h2 className="text-lg font-medium text-white">I&apos;m the photographer</h2>
+          <h2 className="text-lg font-medium text-white">I&apos;m selecting photos</h2>
           <p className="mt-2 text-sm text-zinc-400">
-            Open the link your client sends you (looks like{" "}
-            <span className="font-mono text-zinc-300">/p/…</span>). Bookmark it;
-            no Google login required on your side.
+            Use the pick link your photographer sends you (looks like{" "}
+            <span className="font-mono text-zinc-300">/pick/…</span>). No Google
+            sign-in required.
           </p>
         </div>
       </div>
