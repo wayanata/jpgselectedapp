@@ -7,13 +7,15 @@
   "compatibility_date": "2026-05-10",
   "compatibility_flags": ["nodejs_compat"],
   // Prisma `engineType = "client"` loads `query_compiler_bg.wasm` from `.open-next/**/node_modules/.prisma/client/`.
-  // Without this, runtime fails: readAll '/bundle/node_modules/.prisma/client/query_compiler_bg.wasm'
+  // Use `**/*.wasm` here (not a narrower glob): a compiler-only glob can omit the module from the `/bundle/...`
+  // layout Prisma’s loader `readAll`s at runtime. `scripts/prune-prisma-worker-wasm.mjs` removes unused
+  // `query_engine_bg.*` after build so only the compiler WASM is present and the bundle stays small.
   // @see https://developers.cloudflare.com/workers/wrangler/configuration/#find-additional-modules
   "find_additional_modules": true,
   "rules": [
     {
       "type": "CompiledWasm",
-      "globs": ["**/query_compiler_bg.wasm"],
+      "globs": ["**/*.wasm"],
       "fallthrough": true
     }
   ],
