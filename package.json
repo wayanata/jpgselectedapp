@@ -1,0 +1,38 @@
+{
+  "name": "jpgselectedapp",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev",
+    "build": "prisma generate && next build",
+    "build:cloudflare": "prisma generate && opennextjs-cloudflare build",
+    "deploy": "npm run build:cloudflare && wrangler deploy",
+    "preview:cloudflare": "opennextjs-cloudflare build && opennextjs-cloudflare preview",
+    "cf-typegen": "wrangler types --env-interface CloudflareEnv cloudflare-env.d.ts",
+    "start": "next start",
+    "lint": "eslint"
+  },
+  "dependencies": {
+    "@auth/prisma-adapter": "^2.7.4",
+    "@prisma/client": "^6.5.0",
+    "googleapis": "^144.0.0",
+    "nanoid": "^5.1.0",
+    "next": "16.2.6",
+    "next-auth": "^5.0.0-beta.25",
+    "react": "19.2.4",
+    "react-dom": "19.2.4"
+  },
+  "devDependencies": {
+    "@opennextjs/cloudflare": "^1.19.8",
+    "@tailwindcss/postcss": "^4",
+    "@types/node": "^20",
+    "@types/react": "^19",
+    "@types/react-dom": "^19",
+    "eslint": "^9",
+    "eslint-config-next": "16.2.6",
+    "prisma": "^6.5.0",
+    "tailwindcss": "^4",
+    "typescript": "^5",
+    "wrangler": "^4.90.0"
+  }
+}
