@@ -68,6 +68,8 @@ npm ci && npm run build:cloudflare && npx wrangler deploy
 
 SQLite (`file:./dev.db`) does not run on Workers. For production on Cloudflare you will need a hosted database (for example **Neon** PostgreSQL, **Turso** with Prisma’s driver adapter, or **D1** with the Prisma D1 adapter) and a matching `DATABASE_URL` / adapter setup.
 
+**Cloudflare Pages asset limit:** each uploaded file must be **≤ 25 MiB**. Large production source maps under `.next/` used to break deploys; this repo builds with **`next build --webpack`** (no production source maps) and runs **`scripts/strip-sourcemaps.mjs`** after OpenNext to delete any leftover `*.map` files.
+
 ## Notes
 
 - Drive access is **read-only**. Thumbnails and “Open in Drive” links depend on the customer’s sharing settings and Google’s thumbnail URLs.
