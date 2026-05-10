@@ -1,7 +1,7 @@
 generator client {
-  provider      = "prisma-client-js"
-  // Cloudflare Workers Builds bundles Linux with OpenSSL 1.1.x; local dev uses `native`.
-  binaryTargets = ["native", "debian-openssl-1.1.x"]
+  provider = "prisma-client-js"
+  // Rust engine not shipped to Workers when using @prisma/adapter-neon + PrismaNeonHTTP in app code.
+  engineType = "client"
 }
 
 datasource db {

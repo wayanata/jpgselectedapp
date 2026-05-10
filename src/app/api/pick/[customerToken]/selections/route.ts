@@ -47,45 +47,44 @@ export async function PUT(
 
   const incomingIds = new Set(normalized.map((f) => f.driveFileId));
 
-  await prisma.$transaction(async (tx) => {
-    await tx.selectedFile.deleteMany({
-      where: {
-        jobId,
-        driveFileId: { notIn: [...incomingIds] },
-      },
-    });
+  // Sequential updates (Neon HTTP driver adapter does not support interactive transactions).
+  await prisma.selectedFile.deleteMany({
+    where: {
+      jobId,
+      driveFileId: { notIn: [...incomingIds] },
+    },
+  });
 
-    for (const f of normalized) {
-      await tx.selectedFile.upsert({
-        where: {
-          jobId_driveFileId: {
-            jobId,
-            driveFileId: f.driveFileId,
-          },
-        },
-        create: {
+  for (const f of normalized) {
+    await prisma.selectedFile.upsert({
+      where: {
+        jobId_driveFileId: {
           jobId,
           driveFileId: f.driveFileId,
-          name: f.name,
-          mimeType: f.mimeType,
-          thumbnailLink: f.thumbnailLink,
-          webViewLink: f.webViewLink,
-          iconLink: f.iconLink,
         },
-        update: {
-          name: f.name,
-          mimeType: f.mimeType,
-          thumbnailLink: f.thumbnailLink,
-          webViewLink: f.webViewLink,
-          iconLink: f.iconLink,
-        },
-      });
-    }
-
-    await tx.job.update({
-      where: { id: jobId },
-      data: { updatedAt: new Date() },
+      },
+      create: {
+        jobId,
+        driveFileId: f.driveFileId,
+        name: f.name,
+        mimeType: f.mimeType,
+        thumbnailLink: f.thumbnailLink,
+        webViewLink: f.webViewLink,
+        iconLink: f.iconLink,
+      },
+      update: {
+        name: f.name,
+        mimeType: f.mimeType,
+        thumbnailLink: f.thumbnailLink,
+        webViewLink: f.webViewLink,
+        iconLink: f.iconLink,
+      },
     });
+  }
+
+  await prisma.job.update({
+    where: { id: jobId },
+    data: { updatedAt: new Date() },
   });
 
   const selections = await prisma.selectedFile.findMany({
