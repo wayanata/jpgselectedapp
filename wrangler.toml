@@ -1,0 +1,4 @@
+# Cloudflare Workers Builds runs a Pages-style "asset output directory" check after deploy.
+# Point it at OpenNext static assets only (small files), not the whole repo (which may contain `.next/cache`).
+# Worker deployment settings remain in `wrangler.jsonc`.
+pages_build_output_dir = ".open-next/assets"
