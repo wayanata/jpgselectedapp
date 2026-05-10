@@ -1,6 +1,7 @@
 /**
  * Cloudflare Pages / Workers Builds validates output dirs with a 25 MiB cap per file.
- * Strip server .map files and remove webpack disk cache (e.g. .next/cache/.../0.pack).
+ * Strip server .map files, then delete `.next` so Workers Builds' Pages-style
+ * validator never sees multi‑MiB webpack packs under `.next/cache`.
  */
 import { readdir, rm, unlink } from "node:fs/promises";
 import { join } from "node:path";
@@ -23,6 +24,4 @@ async function walk(dir) {
 
 for (const r of roots) await walk(r);
 
-await rm(join(process.cwd(), ".next/cache"), { recursive: true, force: true }).catch(
-  () => {},
-);
+await rm(join(process.cwd(), ".next"), { recursive: true, force: true }).catch(() => {});

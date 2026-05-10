@@ -7,7 +7,7 @@
     "build": "prisma generate && next build --webpack",
     "build:cloudflare": "prisma generate && opennextjs-cloudflare build && node scripts/strip-sourcemaps.mjs",
     "deploy": "npm run build:cloudflare && opennextjs-cloudflare deploy && node scripts/rm-next-webpack-cache.mjs",
-    "deploy:wrangler": "npm run build:cloudflare && wrangler deploy",
+    "deploy:wrangler": "npm run build:cloudflare && wrangler deploy && node scripts/rm-next-webpack-cache.mjs",
     "deploy:cf": "npm ci && npm run deploy",
     "preview:cloudflare": "opennextjs-cloudflare build && opennextjs-cloudflare preview",
     "cf-typegen": "wrangler types --env-interface CloudflareEnv cloudflare-env.d.ts",
