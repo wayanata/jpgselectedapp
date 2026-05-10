@@ -74,6 +74,8 @@ npm run deploy:cf
 1. **Wrangler config** is committed as `wrangler.jsonc` (`main`: `.open-next/worker.js`, `assets`: `.open-next/assets`).
 2. **Variables and secrets** on the Worker: `DATABASE_URL` (Postgres), `AUTH_SECRET`, `AUTH_URL`, Google OAuth IDs/secrets, etc.
 
+Prisma is configured with **`binaryTargets`** (`native` + `debian-openssl-1.1.x`) so the query engine matches Cloudflare’s Linux/OpenSSL runtime. If you change `schema.prisma`, run **`npx prisma generate`** before deploy (your **`npm run build`** / **`build:cloudflare`** already runs `prisma generate`).
+
 **Cloudflare Pages asset limit:** each uploaded file must be **≤ 25 MiB**. Large production source maps under `.next/` used to break deploys; this repo builds with **`next build --webpack`** (no production source maps) and runs **`scripts/strip-sourcemaps.mjs`** after OpenNext to delete any leftover `*.map` files.
 
 ## Notes
