@@ -40,30 +40,28 @@ Web app for photography workflows: **customers** sign in with Google, browse **G
 
 This app uses the [**OpenNext Cloudflare**](https://opennext.js.org/cloudflare) adapter. The `.open-next/` folder is created by **`npm run build:cloudflare`** (OpenNext), not by `next build` alone.
 
-**`wrangler.jsonc` includes `build.command`** so a plain **`npx wrangler deploy`** (after **`npm ci`** / **`npm install`**) runs **`npm run build:cloudflare` first**, then uploads the Worker and assets. Without dependencies installed, deploy cannot build.
-
-If an older log showed only `npx wrangler deploy` and *Could not detect a directory containing static files*, that was from **before** this `build` block existed, or from an environment that never ran `npm install`.
-
 ### Workers Builds settings (pick one)
 
-**Option A — separate build + deploy (recommended)**
+**Important:** Plain **`npx wrangler deploy`** often fails on OpenNext projects: Wrangler detects OpenNext and jumps straight to **`opennextjs-cloudflare deploy`** **without** running `wrangler.jsonc`’s `build` step, which triggers *Could not find compiled Open Next config* when `.open-next/` was never built.
+
+Use **`npm run deploy`** (build first, then **`opennextjs-cloudflare deploy`**). Do **not** set the deploy command to **`npx wrangler deploy`** alone.
+
+**Option A — recommended (two steps in Cloudflare)**
 
 | Step | Command |
 |------|---------|
-| Install / build | `npm ci && npm run build:cloudflare` |
-| Deploy | `npx wrangler deploy` |
+| Install | `npm ci` |
+| Deploy | **`npm run deploy`** |
 
-**Option B — single command** (use if your project only runs **one** custom command before/instead of a separate build step)
+**Option B — one command from a clean clone**
 
 ```bash
 npm run deploy:cf
 ```
 
-That script runs `npm ci`, then `build:cloudflare`, then `wrangler deploy`. Equivalent one-liner:
+(`deploy:cf` runs `npm ci` then `npm run deploy`.)
 
-```bash
-npm ci && npm run build:cloudflare && npx wrangler deploy
-```
+**Advanced:** `npm run deploy:wrangler` runs the build then **`wrangler deploy`** (same artifact layout; Wrangler may still delegate to OpenNext under the hood after the build exists).
 
 1. **Wrangler config** is committed as `wrangler.jsonc` (`main`: `.open-next/worker.js`, `assets`: `.open-next/assets`).
 2. Add the same env vars as locally (`AUTH_SECRET`, `DATABASE_URL`, Google OAuth, `NEXTAUTH_URL` / `AUTH_URL` for your production URL) in the dashboard under **Build variables and secrets**.
