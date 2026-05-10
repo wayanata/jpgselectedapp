@@ -10,5 +10,9 @@
   },
   "observability": {
     "enabled": true
+  },
+  // Runs automatically before `wrangler deploy` so bare `npx wrangler deploy` works after `npm ci`.
+  "build": {
+    "command": "npm run build:cloudflare"
   }
 }
