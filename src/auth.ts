@@ -5,12 +5,6 @@ import { PrismaAdapter } from "@auth/prisma-adapter";
 import { prisma } from "@/lib/prisma";
 import { readProcessEnv } from "@/lib/read-env";
 
-// Auth.js defaults are AUTH_GOOGLE_ID / AUTH_GOOGLE_SECRET only; support GOOGLE_CLIENT_* too (see env.example).
-const googleClientId =
-  process.env.AUTH_GOOGLE_ID ?? process.env.GOOGLE_CLIENT_ID ?? "";
-const googleClientSecret =
-  process.env.AUTH_GOOGLE_SECRET ?? process.env.GOOGLE_CLIENT_SECRET ?? "";
-
 /**
  * PrismaAdapter only when explicitly enabled, using runtime env reads (see `read-env.ts`).
  */
@@ -22,19 +16,29 @@ function usePrismaAdapter(): boolean {
   return true;
 }
 
-const googleProvider = Google({
-  clientId: googleClientId,
-  clientSecret: googleClientSecret,
-  authorization: {
-    params: {
-      scope:
-        "openid email profile https://www.googleapis.com/auth/drive.readonly",
-      prompt: "consent",
-      access_type: "offline",
-      response_type: "code",
+function googleProvider() {
+  // Must use readProcessEnv: plain process.env.* can be inlined at build time (empty in CI),
+  // so Workers never see AUTH_SECRET / Google keys at runtime → MissingSecret → HTTP 500.
+  const clientId =
+    readProcessEnv("AUTH_GOOGLE_ID") ?? readProcessEnv("GOOGLE_CLIENT_ID") ?? "";
+  const clientSecret =
+    readProcessEnv("AUTH_GOOGLE_SECRET") ??
+    readProcessEnv("GOOGLE_CLIENT_SECRET") ??
+    "";
+  return Google({
+    clientId,
+    clientSecret,
+    authorization: {
+      params: {
+        scope:
+          "openid email profile https://www.googleapis.com/auth/drive.readonly",
+        prompt: "consent",
+        access_type: "offline",
+        response_type: "code",
+      },
     },
-  },
-});
+  });
+}
 
 const sessionCallback = {
   session({
@@ -57,12 +61,19 @@ const sessionCallback = {
 
 /** Lazy config so each Auth invocation sees current env. */
 export const { handlers, auth, signIn, signOut } = NextAuth(async () => ({
-  secret: process.env.AUTH_SECRET ?? process.env.NEXTAUTH_SECRET,
+  secret:
+    readProcessEnv("AUTH_SECRET") ?? readProcessEnv("NEXTAUTH_SECRET") ?? "",
   ...(usePrismaAdapter()
     ? { adapter: PrismaAdapter(prisma) }
     : { session: { strategy: "jwt" } }),
   trustHost: true,
-  providers: [googleProvider],
+  // Default Auth.js HTML uses Preact SSR; on Workers it can misbehave. `Configuration`
+  // also maps to HTTP 500 on /api/auth/error — redirect to an App Router page instead.
+  pages: {
+    signIn: "/studio",
+    error: "/auth/error",
+  },
+  providers: [googleProvider()],
   callbacks: sessionCallback,
 }));
 
