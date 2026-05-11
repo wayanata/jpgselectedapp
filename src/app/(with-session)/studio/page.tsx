@@ -285,6 +285,14 @@ export default function StudioPage() {
                     <code className="break-all text-xs text-amber-200/90">
                       {job.pickUrl}
                     </code>
+                    <Link
+                      href={`/pick/${encodeURIComponent(job.customerToken)}`}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="rounded border border-amber-700/50 bg-amber-950/30 px-2 py-1 text-[10px] font-medium text-amber-200/90 hover:bg-amber-950/50"
+                    >
+                      Open
+                    </Link>
                     <button
                       type="button"
                       className="rounded border border-zinc-700 px-2 py-1 text-[10px] text-zinc-400 hover:bg-zinc-800"
@@ -304,6 +312,14 @@ export default function StudioPage() {
                     <code className="break-all text-xs text-zinc-400">
                       {job.photographerUrl}
                     </code>
+                    <Link
+                      href={`/p/${encodeURIComponent(job.slug)}`}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="rounded border border-zinc-600 px-2 py-1 text-[10px] font-medium text-zinc-300 hover:bg-zinc-800"
+                    >
+                      Open
+                    </Link>
                     <button
                       type="button"
                       className="rounded border border-zinc-700 px-2 py-1 text-[10px] text-zinc-400 hover:bg-zinc-800"
