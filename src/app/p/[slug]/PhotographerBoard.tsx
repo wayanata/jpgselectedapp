@@ -24,6 +24,7 @@ type Job = {
   id: string;
   title: string;
   updatedAt: string;
+  finishedAt?: string | null;
   selections: SelFile[];
   folders: Folder[];
 };
@@ -97,6 +98,7 @@ export function PhotographerBoard({ slug }: { slug: string }) {
   async function addFolder(e: React.FormEvent) {
     e.preventDefault();
     if (!newFolder.trim()) return;
+    if (job?.finishedAt) return;
     setBusy(true);
     setActionError(null);
     setActionSuccess(null);
@@ -123,6 +125,7 @@ export function PhotographerBoard({ slug }: { slug: string }) {
   }
 
   async function assignFolder(fileId: string, folderId: string | null) {
+    if (job?.finishedAt) return;
     setBusy(true);
     setActionError(null);
     setActionSuccess(null);
@@ -151,6 +154,7 @@ export function PhotographerBoard({ slug }: { slug: string }) {
   }
 
   async function bulkMoveToFolder() {
+    if (job?.finishedAt) return;
     const ids = [...selectedIds];
     if (ids.length === 0) return;
     const folderId = bulkFolderId === "" ? null : bulkFolderId;
@@ -263,6 +267,8 @@ export function PhotographerBoard({ slug }: { slug: string }) {
     );
   }
 
+  const jobLocked = !!job.finishedAt;
+
   return (
     <div className="mx-auto max-w-6xl px-4 py-10">
       {actionSuccess && (
@@ -311,6 +317,19 @@ export function PhotographerBoard({ slug }: { slug: string }) {
           {job.selections.length} file
           {job.selections.length === 1 ? "" : "s"}
         </p>
+        {jobLocked && (
+          <div
+            role="status"
+            className="mt-5 rounded-xl border border-amber-800/60 bg-amber-950/35 px-4 py-3 text-sm text-amber-100"
+          >
+            <p className="font-medium">Job closed</p>
+            <p className="mt-1 text-amber-100/90">
+              This session is marked finished in Studio. You can still download
+              ZIPs; adding folders and moving images into workflow buckets is
+              disabled.
+            </p>
+          </div>
+        )}
       </header>
 
       <section className="mt-10">
@@ -325,11 +344,12 @@ export function PhotographerBoard({ slug }: { slug: string }) {
             value={newFolder}
             onChange={(e) => setNewFolder(e.target.value)}
             placeholder="New folder name"
-            className="min-w-[200px] flex-1 rounded-xl border border-zinc-700 bg-zinc-900 px-4 py-2 text-sm text-white placeholder:text-zinc-600 focus:border-emerald-600 focus:outline-none"
+            disabled={jobLocked}
+            className="min-w-[200px] flex-1 rounded-xl border border-zinc-700 bg-zinc-900 px-4 py-2 text-sm text-white placeholder:text-zinc-600 focus:border-emerald-600 focus:outline-none disabled:opacity-50"
           />
           <button
             type="submit"
-            disabled={busy || !newFolder.trim()}
+            disabled={busy || !newFolder.trim() || jobLocked}
             className="rounded-xl bg-emerald-600 px-4 py-2 text-sm font-medium text-white hover:bg-emerald-500 disabled:opacity-40"
           >
             {busy ? "Adding…" : "Add folder"}
@@ -365,7 +385,7 @@ export function PhotographerBoard({ slug }: { slug: string }) {
               <select
                 value={bulkFolderId}
                 onChange={(e) => setBulkFolderId(e.target.value)}
-                disabled={busy || downloadingZip}
+                disabled={busy || downloadingZip || jobLocked}
                 className="rounded-lg border border-zinc-700 bg-zinc-900 px-3 py-2 text-sm text-zinc-200 focus:border-emerald-600 focus:outline-none"
               >
                 <option value="">Unsorted</option>
@@ -377,7 +397,12 @@ export function PhotographerBoard({ slug }: { slug: string }) {
               </select>
               <button
                 type="button"
-                disabled={busy || downloadingZip || selectedIds.size === 0}
+                disabled={
+                  busy ||
+                  downloadingZip ||
+                  selectedIds.size === 0 ||
+                  jobLocked
+                }
                 onClick={() => void bulkMoveToFolder()}
                 className="rounded-xl bg-emerald-700 px-4 py-2 text-sm font-medium text-white hover:bg-emerald-600 disabled:opacity-40"
               >
@@ -475,7 +500,7 @@ export function PhotographerBoard({ slug }: { slug: string }) {
                   </td>
                   <td className="px-4 py-3">
                     <select
-                      disabled={busy || downloadingZip}
+                      disabled={busy || downloadingZip || jobLocked}
                       value={file.folderId ?? ""}
                       onChange={(e) => {
                         const v = e.target.value;

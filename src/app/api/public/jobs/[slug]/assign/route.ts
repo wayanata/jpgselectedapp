@@ -46,6 +46,15 @@ async function runAssign(
     if (!job) {
       return NextResponse.json({ error: "Not found" }, { status: 404 });
     }
+    if (job.finishedAt) {
+      return NextResponse.json(
+        {
+          error:
+            "This job is marked finished. Reopen it in Studio to move selections.",
+        },
+        { status: 403 }
+      );
+    }
 
     let selectedFileId: string | undefined;
     let folderId: string | null = null;

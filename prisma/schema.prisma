@@ -71,6 +71,8 @@ model Job {
 
   createdAt   DateTime       @default(now())
   updatedAt   DateTime       @updatedAt
+  /// When set, the client pick flow is closed and selection edits are blocked.
+  finishedAt  DateTime?
 
   photographerId String
   photographer   User        @relation("JobPhotographer", fields: [photographerId], references: [id], onDelete: Cascade)

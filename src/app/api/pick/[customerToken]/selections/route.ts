@@ -19,10 +19,19 @@ export async function PUT(
 
     const job = await prisma.job.findUnique({
       where: { customerToken },
-      select: { id: true },
+      select: { id: true, finishedAt: true },
     });
     if (!job) {
       return NextResponse.json({ error: "Job not found" }, { status: 404 });
+    }
+    if (job.finishedAt) {
+      return NextResponse.json(
+        {
+          error:
+            "This selection job is closed. The photographer has marked it as finished.",
+        },
+        { status: 403 }
+      );
     }
 
     const jobId = job.id;

@@ -12,6 +12,15 @@ export async function POST(
     if (!job) {
       return NextResponse.json({ error: "Not found" }, { status: 404 });
     }
+    if (job.finishedAt) {
+      return NextResponse.json(
+        {
+          error:
+            "This job is marked finished. Reopen it in Studio to add folders.",
+        },
+        { status: 403 }
+      );
+    }
 
     let name = "Folder";
     try {

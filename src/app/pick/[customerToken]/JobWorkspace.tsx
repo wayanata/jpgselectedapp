@@ -52,6 +52,7 @@ export function JobWorkspace({ customerToken }: { customerToken: string }) {
   const [imagesOnly, setImagesOnly] = useState(true);
 
   const [jobTitle, setJobTitle] = useState("");
+  const [finishedAt, setFinishedAt] = useState<string | null>(null);
   const [photographerUrl, setPhotographerUrl] = useState<string | null>(null);
   const [loadingJob, setLoadingJob] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -68,6 +69,7 @@ export function JobWorkspace({ customerToken }: { customerToken: string }) {
         error?: string;
         job?: {
           title: string;
+          finishedAt?: string | null;
           selections?: Array<{
             driveFileId: string;
             name: string;
@@ -83,6 +85,7 @@ export function JobWorkspace({ customerToken }: { customerToken: string }) {
       if (!res.ok) throw new Error(data.error ?? "Could not load job");
       if (!data.job) throw new Error("Invalid response");
       setJobTitle(data.job.title);
+      setFinishedAt(data.job.finishedAt ?? null);
       setPhotographerUrl(data.photographerUrl ?? null);
       setRootFolderId(data.driveFolderId ?? null);
       const next: SelectedMap = {};
@@ -157,6 +160,7 @@ export function JobWorkspace({ customerToken }: { customerToken: string }) {
   }
 
   async function saveSelections() {
+    if (finishedAt) return;
     setSaving(true);
     setSaveFeedback(null);
     try {
@@ -191,6 +195,7 @@ export function JobWorkspace({ customerToken }: { customerToken: string }) {
   }, [saveFeedback]);
 
   function toggleFile(entry: DriveEntry) {
+    if (finishedAt) return;
     if (isFolder(entry.mimeType)) return;
     setSelected((prev) => {
       const next = { ...prev };
@@ -210,6 +215,7 @@ export function JobWorkspace({ customerToken }: { customerToken: string }) {
   }
 
   const selectedCount = Object.keys(selected).length;
+  const jobLocked = !!finishedAt;
 
   if (loadingJob) {
     return (
@@ -238,7 +244,7 @@ export function JobWorkspace({ customerToken }: { customerToken: string }) {
         <div className="flex flex-col items-end gap-2">
           <button
             type="button"
-            disabled={saving}
+            disabled={saving || jobLocked}
             onClick={() => void saveSelections()}
             className="rounded-xl bg-amber-500 px-4 py-2.5 text-sm font-medium text-zinc-950 hover:bg-amber-400 disabled:opacity-50"
           >
@@ -246,6 +252,19 @@ export function JobWorkspace({ customerToken }: { customerToken: string }) {
           </button>
         </div>
       </div>
+
+      {jobLocked && (
+        <div
+          role="status"
+          className="mt-6 rounded-xl border border-amber-800/60 bg-amber-950/35 px-4 py-3 text-sm text-amber-100"
+        >
+          <p className="font-medium">This job is closed</p>
+          <p className="mt-1 text-amber-100/90">
+            Your photographer marked this session finished. You can still browse
+            the gallery, but you can&apos;t change your selection.
+          </p>
+        </div>
+      )}
 
       {saveFeedback && (
         <div
@@ -363,7 +382,7 @@ export function JobWorkspace({ customerToken }: { customerToken: string }) {
                 picked
                   ? "border-amber-500 ring-1 ring-amber-500/40"
                   : "border-zinc-800 hover:border-zinc-600"
-              }`}
+              } ${jobLocked && !folder ? "cursor-not-allowed opacity-90" : ""}`}
             >
               <div className="relative aspect-square bg-zinc-900">
                 {folder ? (

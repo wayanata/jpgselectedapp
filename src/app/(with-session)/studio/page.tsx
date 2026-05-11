@@ -12,6 +12,7 @@ type JobRow = {
   customerToken: string;
   driveFolderId: string;
   updatedAt: string;
+  finishedAt: string | null;
   pickUrl: string;
   photographerUrl: string;
   _count: { selections: number };
@@ -26,6 +27,7 @@ export default function StudioPage() {
   const [title, setTitle] = useState("Photo selections");
   const [driveFolderId, setDriveFolderId] = useState("");
   const [creating, setCreating] = useState(false);
+  const [jobActionId, setJobActionId] = useState<string | null>(null);
 
   const loadJobs = useCallback(async () => {
     setLoading(true);
@@ -69,6 +71,51 @@ export default function StudioPage() {
       setError(e instanceof Error ? e.message : "Error");
     } finally {
       setCreating(false);
+    }
+  }
+
+  async function setJobFinished(jobId: string, finished: boolean) {
+    setJobActionId(jobId);
+    setError(null);
+    try {
+      const { res, data } = await fetchApiJson<{ error?: string }>(
+        `/api/studio/jobs/${jobId}`,
+        {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ finished }),
+        }
+      );
+      if (!res.ok) throw new Error(data.error ?? "Could not update job");
+      await loadJobs();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Error");
+    } finally {
+      setJobActionId(null);
+    }
+  }
+
+  async function deleteJob(jobId: string, title: string) {
+    const ok = confirm(
+      `Delete “${title}”? This removes picks and workflow folders from the app. Files stay in Google Drive.`
+    );
+    if (!ok) return;
+    setJobActionId(jobId);
+    setError(null);
+    try {
+      const res = await fetch(`/api/studio/jobs/${jobId}`, {
+        method: "DELETE",
+        cache: "no-store",
+      });
+      if (!res.ok) {
+        const t = await res.text();
+        throw new Error(t.slice(0, 200) || `HTTP ${res.status}`);
+      }
+      await loadJobs();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Could not delete job");
+    } finally {
+      setJobActionId(null);
     }
   }
 
@@ -171,13 +218,60 @@ export default function StudioPage() {
           {jobs.map((job) => (
             <li
               key={job.id}
-              className="rounded-xl border border-zinc-800 bg-zinc-900/40 p-4"
+              className={`rounded-xl border bg-zinc-900/40 p-4 ${
+                job.finishedAt
+                  ? "border-zinc-700 opacity-90"
+                  : "border-zinc-800"
+              }`}
             >
-              <p className="font-medium text-white">{job.title}</p>
-              <p className="mt-1 text-xs text-zinc-500">
-                {job._count.selections} selection(s) · Updated{" "}
-                {new Date(job.updatedAt).toLocaleString()}
-              </p>
+              <div className="flex flex-wrap items-start justify-between gap-3">
+                <div>
+                  <p className="font-medium text-white">{job.title}</p>
+                  <p className="mt-1 text-xs text-zinc-500">
+                    {job._count.selections} selection(s) · Updated{" "}
+                    {new Date(job.updatedAt).toLocaleString()}
+                  </p>
+                  {job.finishedAt ? (
+                    <p className="mt-2 inline-flex rounded-lg border border-emerald-800/60 bg-emerald-950/50 px-2 py-1 text-xs text-emerald-200">
+                      Finished ·{" "}
+                      {new Date(job.finishedAt).toLocaleString()}
+                    </p>
+                  ) : (
+                    <p className="mt-2 inline-flex rounded-lg border border-amber-900/50 bg-amber-950/30 px-2 py-1 text-xs text-amber-200/90">
+                      Active
+                    </p>
+                  )}
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  {job.finishedAt ? (
+                    <button
+                      type="button"
+                      disabled={jobActionId !== null}
+                      onClick={() => void setJobFinished(job.id, false)}
+                      className="rounded-lg border border-zinc-600 px-3 py-1.5 text-xs text-zinc-200 hover:bg-zinc-800 disabled:opacity-40"
+                    >
+                      {jobActionId === job.id ? "…" : "Reopen"}
+                    </button>
+                  ) : (
+                    <button
+                      type="button"
+                      disabled={jobActionId !== null}
+                      onClick={() => void setJobFinished(job.id, true)}
+                      className="rounded-lg border border-emerald-700/60 bg-emerald-950/40 px-3 py-1.5 text-xs text-emerald-100 hover:bg-emerald-950/70 disabled:opacity-40"
+                    >
+                      {jobActionId === job.id ? "…" : "Mark finished"}
+                    </button>
+                  )}
+                  <button
+                    type="button"
+                    disabled={jobActionId !== null}
+                    onClick={() => void deleteJob(job.id, job.title)}
+                    className="rounded-lg border border-red-900/50 px-3 py-1.5 text-xs text-red-300 hover:bg-red-950/40 disabled:opacity-40"
+                  >
+                    {jobActionId === job.id ? "…" : "Delete"}
+                  </button>
+                </div>
+              </div>
               <div className="mt-3 space-y-2">
                 <div>
                   <p className="text-[10px] uppercase tracking-wide text-zinc-500">
