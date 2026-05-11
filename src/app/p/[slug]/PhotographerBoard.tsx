@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { fetchApiJson } from "@/lib/client-fetch-json";
 
@@ -23,6 +24,7 @@ type SelFile = {
 type Job = {
   id: string;
   title: string;
+  customerToken: string;
   updatedAt: string;
   finishedAt?: string | null;
   selections: SelFile[];
@@ -317,6 +319,34 @@ export function PhotographerBoard({ slug }: { slug: string }) {
           {job.selections.length} file
           {job.selections.length === 1 ? "" : "s"}
         </p>
+        <div className="mt-5 flex flex-wrap items-center gap-2">
+          <Link
+            href={`/pick/${encodeURIComponent(job.customerToken)}`}
+            target="_blank"
+            rel="noreferrer"
+            className="inline-flex items-center rounded-xl border border-amber-600/70 bg-amber-950/50 px-4 py-2.5 text-sm font-medium text-amber-100 hover:bg-amber-950/80"
+          >
+            Open client pick page
+          </Link>
+          <button
+            type="button"
+            className="rounded-xl border border-zinc-600 px-4 py-2.5 text-sm text-zinc-300 hover:bg-zinc-800"
+            onClick={() => {
+              const url = `${window.location.origin}/pick/${job.customerToken}`;
+              void navigator.clipboard.writeText(url).then(
+                () => {
+                  setActionSuccess("Client pick link copied to clipboard.");
+                  setActionError(null);
+                },
+                () => {
+                  setActionError("Could not copy link — copy it manually from the address bar after opening.");
+                }
+              );
+            }}
+          >
+            Copy client pick link
+          </button>
+        </div>
         {jobLocked && (
           <div
             role="status"
