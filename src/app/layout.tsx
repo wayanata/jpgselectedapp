@@ -15,16 +15,13 @@ const geistMono = Geist_Mono({
 export const metadata: Metadata = {
   title: "Drive selections",
   description: "Pick photos from Google Drive for your photographer",
-  /** Static PNG in `public/` — Safari “Add to Home Screen” often ignores dynamic `apple-icon` routes. */
+  /**
+   * Favicon: `app/icon.svg`.
+   * Apple touch: static `app/apple-icon.png` (required for OpenNext — never use edge `apple-icon.tsx`).
+   * Safari also probes `public/apple-touch-icon.png` at the site root.
+   */
   icons: {
     icon: [{ url: "/icon.svg", type: "image/svg+xml" }],
-    apple: [
-      {
-        url: "/apple-touch-icon.png",
-        sizes: "180x180",
-        type: "image/png",
-      },
-    ],
   },
   appleWebApp: {
     capable: true,
