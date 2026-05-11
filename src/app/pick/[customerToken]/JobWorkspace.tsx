@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { readJsonResponse } from "@/lib/read-json-response";
+import { fetchApiJson } from "@/lib/client-fetch-json";
 
 type DriveEntry = {
   id: string;
@@ -64,8 +64,7 @@ export function JobWorkspace({ customerToken }: { customerToken: string }) {
   const loadJob = useCallback(async () => {
     setLoadingJob(true);
     try {
-      const res = await fetch(`/api/pick/${customerToken}/job`);
-      const data = await readJsonResponse<{
+      const { res, data } = await fetchApiJson<{
         error?: string;
         job?: {
           title: string;
@@ -80,7 +79,7 @@ export function JobWorkspace({ customerToken }: { customerToken: string }) {
         };
         photographerUrl?: string | null;
         driveFolderId?: string;
-      }>(res);
+      }>(`/api/pick/${customerToken}/job`);
       if (!res.ok) throw new Error(data.error ?? "Could not load job");
       if (!data.job) throw new Error("Invalid response");
       setJobTitle(data.job.title);
@@ -120,12 +119,11 @@ export function JobWorkspace({ customerToken }: { customerToken: string }) {
           folderId,
         });
         if (token) params.set("pageToken", token);
-        const res = await fetch(`/api/drive/browse?${params}`);
-        const data = await readJsonResponse<{
+        const { res, data } = await fetchApiJson<{
           error?: string;
           files?: DriveEntry[];
           nextPageToken?: string;
-        }>(res);
+        }>(`/api/drive/browse?${params}`);
         if (!res.ok) throw new Error(data.error ?? "Drive request failed");
         const files = (data.files ?? []) as DriveEntry[];
         setEntries((prev) => (token ? [...prev, ...files] : files));
@@ -163,15 +161,14 @@ export function JobWorkspace({ customerToken }: { customerToken: string }) {
     setSaveFeedback(null);
     try {
       const files = Object.values(selected);
-      const res = await fetch(`/api/pick/${customerToken}/selections`, {
+      const { res, data } = await fetchApiJson<{
+        error?: string;
+        selections?: unknown[];
+      }>(`/api/pick/${customerToken}/selections`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ files }),
       });
-      const data = await readJsonResponse<{
-        error?: string;
-        selections?: unknown[];
-      }>(res);
       if (!res.ok) throw new Error(data.error ?? "Save failed");
       const n = data.selections?.length ?? files.length;
       setSaveFeedback({

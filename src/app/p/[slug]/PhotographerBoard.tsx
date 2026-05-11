@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { readJsonResponse } from "@/lib/read-json-response";
+import { fetchApiJson } from "@/lib/client-fetch-json";
 
 type Folder = {
   id: string;
@@ -44,8 +44,9 @@ export function PhotographerBoard({ slug }: { slug: string }) {
     setLoading(true);
     setLoadError(null);
     try {
-      const res = await fetch(`/api/public/jobs/${slug}`);
-      const data = await readJsonResponse<{ error?: string; job?: Job }>(res);
+      const { res, data } = await fetchApiJson<{ error?: string; job?: Job }>(
+        `/api/public/jobs/${slug}`
+      );
       if (!res.ok) throw new Error(data.error ?? "Not found");
       if (!data.job) throw new Error("Invalid response");
       setJob(data.job);
@@ -99,15 +100,14 @@ export function PhotographerBoard({ slug }: { slug: string }) {
     setActionError(null);
     setActionSuccess(null);
     try {
-      const res = await fetch(`/api/public/jobs/${slug}/folders`, {
+      const { res, data } = await fetchApiJson<{
+        error?: string;
+        folder?: { name: string };
+      }>(`/api/public/jobs/${slug}/folders`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ name: newFolder.trim() }),
       });
-      const data = await readJsonResponse<{
-        error?: string;
-        folder?: { name: string };
-      }>(res);
       if (!res.ok) throw new Error(data.error ?? "Failed");
       setNewFolder("");
       await load();
@@ -126,13 +126,13 @@ export function PhotographerBoard({ slug }: { slug: string }) {
     setActionError(null);
     setActionSuccess(null);
     try {
-      const res = await fetch(`/api/public/jobs/${slug}/assign`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ selectedFileId: fileId, folderId }),
-      });
-      const data = await readJsonResponse<{ error?: string; file: SelFile }>(
-        res
+      const { res, data } = await fetchApiJson<{ error?: string; file: SelFile }>(
+        `/api/public/jobs/${slug}/assign`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ selectedFileId: fileId, folderId }),
+        }
       );
       if (!res.ok) throw new Error(data.error ?? "Failed");
       setJob((prev) => {
@@ -159,14 +159,14 @@ export function PhotographerBoard({ slug }: { slug: string }) {
     try {
       const results: SelFile[] = [];
       for (const fileId of ids) {
-        const res = await fetch(`/api/public/jobs/${slug}/assign`, {
-          method: "PATCH",
+        const { res, data } = await fetchApiJson<{
+          error?: string;
+          file: SelFile;
+        }>(`/api/public/jobs/${slug}/assign`, {
+          method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ selectedFileId: fileId, folderId }),
         });
-        const data = await readJsonResponse<{ error?: string; file: SelFile }>(
-          res
-        );
         if (!res.ok) throw new Error(data.error ?? "Failed");
         results.push(data.file);
       }

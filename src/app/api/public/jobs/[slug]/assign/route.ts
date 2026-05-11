@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 
-export async function PATCH(
+async function runAssign(
   req: Request,
   ctx: { params: Promise<{ slug: string }> }
 ) {
@@ -75,4 +75,19 @@ export async function PATCH(
       { status: 500 }
     );
   }
+}
+
+/** POST duplicate: some networks strip or mishandle PATCH; client uses POST first. */
+export async function POST(
+  req: Request,
+  ctx: { params: Promise<{ slug: string }> }
+) {
+  return runAssign(req, ctx);
+}
+
+export async function PATCH(
+  req: Request,
+  ctx: { params: Promise<{ slug: string }> }
+) {
+  return runAssign(req, ctx);
 }

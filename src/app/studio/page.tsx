@@ -3,7 +3,7 @@
 import { signIn, signOut, useSession } from "next-auth/react";
 import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
-import { readJsonResponse } from "@/lib/read-json-response";
+import { fetchApiJson } from "@/lib/client-fetch-json";
 
 type JobRow = {
   id: string;
@@ -31,10 +31,10 @@ export default function StudioPage() {
     setLoading(true);
     setError(null);
     try {
-      const res = await fetch("/api/studio/jobs");
-      const data = await readJsonResponse<{ jobs?: JobRow[]; error?: string }>(
-        res
-      );
+      const { res, data } = await fetchApiJson<{
+        jobs?: JobRow[];
+        error?: string;
+      }>("/api/studio/jobs");
       if (!res.ok) throw new Error(data.error ?? "Could not load jobs");
       setJobs(data.jobs ?? []);
     } catch (e) {
@@ -54,12 +54,14 @@ export default function StudioPage() {
     setCreating(true);
     setError(null);
     try {
-      const res = await fetch("/api/studio/jobs", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ title, driveFolderId }),
-      });
-      const data = await readJsonResponse<{ error?: string }>(res);
+      const { res, data } = await fetchApiJson<{ error?: string }>(
+        "/api/studio/jobs",
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ title, driveFolderId }),
+        }
+      );
       if (!res.ok) throw new Error(data.error ?? "Could not create job");
       setDriveFolderId("");
       await loadJobs();
