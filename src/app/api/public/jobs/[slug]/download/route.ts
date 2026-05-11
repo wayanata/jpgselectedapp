@@ -1,4 +1,4 @@
-import { zip } from "fflate";
+import { zipSync } from "fflate";
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import {
@@ -146,12 +146,9 @@ export async function POST(
       zipFiles[pathInZip] = bytes;
     }
 
-    const zipped = await new Promise<Uint8Array>((resolve, reject) => {
-      zip(zipFiles, { level: 6 }, (err, data) => {
-        if (err) reject(err);
-        else resolve(data);
-      });
-    });
+    // Use zipSync: async `zip()` from fflate spawns Web Workers (Blob URLs), which
+    // Cloudflare Workers do not support ("The Worker method is not implemented").
+    const zipped = zipSync(zipFiles, { level: 6 });
 
     const filename = slugZipName(job.title);
 
