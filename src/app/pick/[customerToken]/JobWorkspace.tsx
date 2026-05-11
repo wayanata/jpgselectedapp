@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 type DriveEntry = {
   id: string;
@@ -54,7 +54,11 @@ export function JobWorkspace({ customerToken }: { customerToken: string }) {
   const [photographerUrl, setPhotographerUrl] = useState<string | null>(null);
   const [loadingJob, setLoadingJob] = useState(true);
   const [saving, setSaving] = useState(false);
-  const [saveMsg, setSaveMsg] = useState<string | null>(null);
+  const [saveFeedback, setSaveFeedback] = useState<{
+    kind: "success" | "error";
+    text: string;
+  } | null>(null);
+  const saveBannerRef = useRef<HTMLDivElement>(null);
 
   const loadJob = useCallback(async () => {
     setLoadingJob(true);
@@ -135,7 +139,7 @@ export function JobWorkspace({ customerToken }: { customerToken: string }) {
 
   async function saveSelections() {
     setSaving(true);
-    setSaveMsg(null);
+    setSaveFeedback(null);
     try {
       const files = Object.values(selected);
       const res = await fetch(`/api/pick/${customerToken}/selections`, {
@@ -145,13 +149,25 @@ export function JobWorkspace({ customerToken }: { customerToken: string }) {
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error ?? "Save failed");
-      setSaveMsg(`Saved ${data.selections?.length ?? files.length} images.`);
+      const n = data.selections?.length ?? files.length;
+      setSaveFeedback({
+        kind: "success",
+        text: `Saved ${n} image${n === 1 ? "" : "s"}. Your photographer can see them on their board.`,
+      });
     } catch (e) {
-      setSaveMsg(e instanceof Error ? e.message : "Save failed");
+      setSaveFeedback({
+        kind: "error",
+        text: e instanceof Error ? e.message : "Save failed",
+      });
     } finally {
       setSaving(false);
     }
   }
+
+  useEffect(() => {
+    if (saveFeedback?.kind !== "success") return;
+    saveBannerRef.current?.scrollIntoView({ behavior: "smooth", block: "nearest" });
+  }, [saveFeedback]);
 
   function toggleFile(entry: DriveEntry) {
     if (isFolder(entry.mimeType)) return;
@@ -202,16 +218,38 @@ export function JobWorkspace({ customerToken }: { customerToken: string }) {
           <button
             type="button"
             disabled={saving}
-            onClick={saveSelections}
+            onClick={() => void saveSelections()}
             className="rounded-xl bg-amber-500 px-4 py-2.5 text-sm font-medium text-zinc-950 hover:bg-amber-400 disabled:opacity-50"
           >
             {saving ? "Saving…" : `Save selection (${selectedCount})`}
           </button>
-          {saveMsg && (
-            <p className="max-w-xs text-right text-xs text-zinc-400">{saveMsg}</p>
-          )}
         </div>
       </div>
+
+      {saveFeedback && (
+        <div
+          ref={saveBannerRef}
+          role={saveFeedback.kind === "success" ? "status" : "alert"}
+          aria-live="polite"
+          className={`mt-6 rounded-xl border px-4 py-4 text-sm ${
+            saveFeedback.kind === "success"
+              ? "border-emerald-700/70 bg-emerald-950/50 text-emerald-100"
+              : "border-red-800/70 bg-red-950/40 text-red-100"
+          }`}
+        >
+          <p className="font-medium">
+            {saveFeedback.kind === "success" ? "All set" : "Could not save"}
+          </p>
+          <p className="mt-1 text-balance opacity-95">{saveFeedback.text}</p>
+          <button
+            type="button"
+            onClick={() => setSaveFeedback(null)}
+            className="mt-3 text-xs underline opacity-90 hover:opacity-100"
+          >
+            Dismiss
+          </button>
+        </div>
+      )}
 
       {photographerUrl && (
         <div className="mt-8 rounded-xl border border-zinc-800 bg-zinc-900/50 p-4">

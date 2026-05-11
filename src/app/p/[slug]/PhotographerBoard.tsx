@@ -29,21 +29,26 @@ type Job = {
 
 export function PhotographerBoard({ slug }: { slug: string }) {
   const [job, setJob] = useState<Job | null>(null);
-  const [error, setError] = useState<string | null>(null);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [newFolder, setNewFolder] = useState("");
   const [busy, setBusy] = useState(false);
+  /** Inline feedback — never replaces the whole board */
+  const [actionError, setActionError] = useState<string | null>(null);
+  const [actionSuccess, setActionSuccess] = useState<string | null>(null);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(() => new Set());
+  const [bulkFolderId, setBulkFolderId] = useState<string>("");
 
   const load = useCallback(async () => {
     setLoading(true);
-    setError(null);
+    setLoadError(null);
     try {
       const res = await fetch(`/api/public/jobs/${slug}`);
       const data = await res.json();
       if (!res.ok) throw new Error(data.error ?? "Not found");
       setJob(data.job);
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Error");
+      setLoadError(e instanceof Error ? e.message : "Error");
       setJob(null);
     } finally {
       setLoading(false);
@@ -57,10 +62,40 @@ export function PhotographerBoard({ slug }: { slug: string }) {
     return () => clearTimeout(t);
   }, [load]);
 
+  const foldersSorted = useMemo(
+    () => [...(job?.folders ?? [])].sort((a, b) => a.sortOrder - b.sortOrder),
+    [job?.folders]
+  );
+
+  const selectionIds = useMemo(
+    () => job?.selections.map((s) => s.id) ?? [],
+    [job?.selections]
+  );
+
+  const allSelected =
+    selectionIds.length > 0 &&
+    selectionIds.every((id) => selectedIds.has(id));
+
+  function toggleSelect(id: string) {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }
+
+  function toggleSelectAll() {
+    if (allSelected) setSelectedIds(new Set());
+    else setSelectedIds(new Set(selectionIds));
+  }
+
   async function addFolder(e: React.FormEvent) {
     e.preventDefault();
     if (!newFolder.trim()) return;
     setBusy(true);
+    setActionError(null);
+    setActionSuccess(null);
     try {
       const res = await fetch(`/api/public/jobs/${slug}/folders`, {
         method: "POST",
@@ -71,8 +106,11 @@ export function PhotographerBoard({ slug }: { slug: string }) {
       if (!res.ok) throw new Error(data.error ?? "Failed");
       setNewFolder("");
       await load();
+      setActionSuccess(
+        `Folder “${data.folder?.name ?? newFolder.trim()}” added. Assign photos with the row menu or bulk move below.`
+      );
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Error");
+      setActionError(e instanceof Error ? e.message : "Could not add folder");
     } finally {
       setBusy(false);
     }
@@ -80,6 +118,8 @@ export function PhotographerBoard({ slug }: { slug: string }) {
 
   async function assignFolder(fileId: string, folderId: string | null) {
     setBusy(true);
+    setActionError(null);
+    setActionSuccess(null);
     try {
       const res = await fetch(`/api/public/jobs/${slug}/assign`, {
         method: "PATCH",
@@ -96,18 +136,57 @@ export function PhotographerBoard({ slug }: { slug: string }) {
         return { ...prev, selections };
       });
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Error");
+      setActionError(e instanceof Error ? e.message : "Could not update folder");
     } finally {
       setBusy(false);
     }
   }
 
-  const foldersSorted = useMemo(
-    () => [...(job?.folders ?? [])].sort((a, b) => a.sortOrder - b.sortOrder),
-    [job?.folders]
-  );
+  async function bulkMoveToFolder() {
+    const ids = [...selectedIds];
+    if (ids.length === 0) return;
+    const folderId = bulkFolderId === "" ? null : bulkFolderId;
+    setBusy(true);
+    setActionError(null);
+    setActionSuccess(null);
+    try {
+      const results = await Promise.all(
+        ids.map(async (fileId) => {
+          const res = await fetch(`/api/public/jobs/${slug}/assign`, {
+            method: "PATCH",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ selectedFileId: fileId, folderId }),
+          });
+          const data = await res.json();
+          if (!res.ok) throw new Error(data.error ?? "Failed");
+          return data.file as SelFile;
+        })
+      );
+      const byId = new Map(results.map((f) => [f.id, f]));
+      setJob((prev) => {
+        if (!prev) return prev;
+        const selections = prev.selections.map((s) => {
+          const u = byId.get(s.id);
+          return u ? { ...s, ...u, folder: u.folder } : s;
+        });
+        return { ...prev, selections };
+      });
+      setSelectedIds(new Set());
+      const label =
+        folderId === null
+          ? "Unsorted"
+          : foldersSorted.find((f) => f.id === folderId)?.name ?? "folder";
+      setActionSuccess(`Moved ${ids.length} image(s) to “${label}”.`);
+    } catch (e) {
+      setActionError(
+        e instanceof Error ? e.message : "Bulk move failed — try again"
+      );
+    } finally {
+      setBusy(false);
+    }
+  }
 
-  if (loading) {
+  if (loading && !job) {
     return (
       <div className="flex min-h-[40vh] items-center justify-center text-zinc-500">
         Loading…
@@ -115,16 +194,52 @@ export function PhotographerBoard({ slug }: { slug: string }) {
     );
   }
 
-  if (error || !job) {
+  if (!job) {
     return (
       <div className="mx-auto max-w-lg px-6 py-20 text-center">
-        <p className="text-red-300">{error ?? "Job not found"}</p>
+        <p className="text-red-300">{loadError ?? "Job not found"}</p>
       </div>
     );
   }
 
   return (
     <div className="mx-auto max-w-6xl px-4 py-10">
+      {actionSuccess && (
+        <div
+          role="status"
+          aria-live="polite"
+          className="mb-6 rounded-xl border border-emerald-800/60 bg-emerald-950/40 px-4 py-3 text-sm text-emerald-100"
+        >
+          <div className="flex flex-wrap items-start justify-between gap-2">
+            <p>{actionSuccess}</p>
+            <button
+              type="button"
+              onClick={() => setActionSuccess(null)}
+              className="shrink-0 text-xs text-emerald-400/90 underline hover:text-emerald-300"
+            >
+              Dismiss
+            </button>
+          </div>
+        </div>
+      )}
+      {actionError && (
+        <div
+          role="alert"
+          className="mb-6 rounded-xl border border-red-900/50 bg-red-950/40 px-4 py-3 text-sm text-red-100"
+        >
+          <div className="flex flex-wrap items-start justify-between gap-2">
+            <p>{actionError}</p>
+            <button
+              type="button"
+              onClick={() => setActionError(null)}
+              className="shrink-0 text-xs text-red-300 underline hover:text-red-200"
+            >
+              Dismiss
+            </button>
+          </div>
+        </div>
+      )}
+
       <header className="border-b border-zinc-800 pb-8">
         <p className="text-xs font-medium uppercase tracking-widest text-emerald-400/90">
           Photographer view
@@ -156,7 +271,7 @@ export function PhotographerBoard({ slug }: { slug: string }) {
             disabled={busy || !newFolder.trim()}
             className="rounded-xl bg-emerald-600 px-4 py-2 text-sm font-medium text-white hover:bg-emerald-500 disabled:opacity-40"
           >
-            Add folder
+            {busy ? "Adding…" : "Add folder"}
           </button>
         </form>
 
@@ -176,10 +291,53 @@ export function PhotographerBoard({ slug }: { slug: string }) {
 
       <section className="mt-12">
         <h2 className="text-lg font-medium text-white">Selected images</h2>
+
+        {job.selections.length > 0 && (
+          <div className="mt-4 flex flex-col gap-3 rounded-xl border border-zinc-800 bg-zinc-900/30 p-4 sm:flex-row sm:flex-wrap sm:items-end">
+            <p className="text-sm text-zinc-400">
+              <span className="font-medium text-zinc-200">
+                {selectedIds.size}
+              </span>{" "}
+              selected — move many at once:
+            </p>
+            <select
+              value={bulkFolderId}
+              onChange={(e) => setBulkFolderId(e.target.value)}
+              disabled={busy}
+              className="rounded-lg border border-zinc-700 bg-zinc-900 px-3 py-2 text-sm text-zinc-200 focus:border-emerald-600 focus:outline-none"
+            >
+              <option value="">Unsorted</option>
+              {foldersSorted.map((f) => (
+                <option key={f.id} value={f.id}>
+                  {f.name}
+                </option>
+              ))}
+            </select>
+            <button
+              type="button"
+              disabled={busy || selectedIds.size === 0}
+              onClick={() => void bulkMoveToFolder()}
+              className="rounded-xl bg-emerald-700 px-4 py-2 text-sm font-medium text-white hover:bg-emerald-600 disabled:opacity-40"
+            >
+              Move selected
+            </button>
+          </div>
+        )}
+
         <div className="mt-6 overflow-x-auto rounded-xl border border-zinc-800">
-          <table className="w-full min-w-[640px] text-left text-sm">
+          <table className="w-full min-w-[720px] text-left text-sm">
             <thead className="border-b border-zinc-800 bg-zinc-900/80 text-xs uppercase text-zinc-500">
               <tr>
+                <th className="w-10 px-2 py-3 font-medium">
+                  <input
+                    type="checkbox"
+                    checked={allSelected}
+                    onChange={toggleSelectAll}
+                    disabled={busy || selectionIds.length === 0}
+                    title="Select all"
+                    className="rounded border-zinc-600 bg-zinc-900"
+                  />
+                </th>
                 <th className="px-4 py-3 font-medium">Preview</th>
                 <th className="px-4 py-3 font-medium">Name</th>
                 <th className="px-4 py-3 font-medium">Folder</th>
@@ -189,6 +347,16 @@ export function PhotographerBoard({ slug }: { slug: string }) {
             <tbody className="divide-y divide-zinc-800">
               {job.selections.map((file) => (
                 <tr key={file.id} className="bg-zinc-950/40">
+                  <td className="px-2 py-3 align-middle">
+                    <input
+                      type="checkbox"
+                      checked={selectedIds.has(file.id)}
+                      onChange={() => toggleSelect(file.id)}
+                      disabled={busy}
+                      aria-label={`Select ${file.name}`}
+                      className="rounded border-zinc-600 bg-zinc-900"
+                    />
+                  </td>
                   <td className="px-4 py-3">
                     <div className="h-14 w-14 overflow-hidden rounded-lg bg-zinc-900">
                       {file.thumbnailLink ? (
@@ -219,7 +387,7 @@ export function PhotographerBoard({ slug }: { slug: string }) {
                       value={file.folderId ?? ""}
                       onChange={(e) => {
                         const v = e.target.value;
-                        assignFolder(file.id, v === "" ? null : v);
+                        void assignFolder(file.id, v === "" ? null : v);
                       }}
                       className="w-full max-w-[200px] rounded-lg border border-zinc-700 bg-zinc-900 px-2 py-1.5 text-xs text-zinc-200 focus:border-emerald-600 focus:outline-none"
                     >
@@ -254,7 +422,7 @@ export function PhotographerBoard({ slug }: { slug: string }) {
         {job.selections.length === 0 && (
           <p className="mt-8 text-center text-zinc-500">
             No images selected yet. Ask your client to save their selection from
-            the customer dashboard.
+            the pick link.
           </p>
         )}
       </section>
