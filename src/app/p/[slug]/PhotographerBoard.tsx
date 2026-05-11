@@ -39,6 +39,7 @@ export function PhotographerBoard({ slug }: { slug: string }) {
   const [actionSuccess, setActionSuccess] = useState<string | null>(null);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(() => new Set());
   const [bulkFolderId, setBulkFolderId] = useState<string>("");
+  const [downloadingZip, setDownloadingZip] = useState(false);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -194,6 +195,58 @@ export function PhotographerBoard({ slug }: { slug: string }) {
     }
   }
 
+  async function downloadZip(ids: string[]) {
+    if (ids.length === 0) return;
+    setDownloadingZip(true);
+    setActionError(null);
+    setActionSuccess(null);
+    try {
+      const res = await fetch(`/api/public/jobs/${slug}/download`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Accept: "application/zip, application/json",
+        },
+        body: JSON.stringify({ selectedFileIds: ids }),
+        cache: "no-store",
+      });
+      const ct = res.headers.get("content-type") ?? "";
+      if (!res.ok) {
+        if (ct.includes("application/json")) {
+          const data = (await res.json()) as { error?: string };
+          throw new Error(data.error ?? "Download failed");
+        }
+        const t = await res.text();
+        throw new Error(t.slice(0, 200) || `HTTP ${res.status}`);
+      }
+      if (!ct.includes("zip") && !ct.includes("octet-stream")) {
+        const t = await res.text();
+        throw new Error(t.slice(0, 160) || "Unexpected response");
+      }
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      const safe =
+        job?.title.replace(/[/\\?*:|"<>]/g, "_").trim().slice(0, 48) ||
+        "selections";
+      a.download = `${safe}.zip`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+      setActionSuccess(
+        `Downloading ZIP with ${ids.length} file${ids.length === 1 ? "" : "s"} (from your Google Drive).`
+      );
+    } catch (e) {
+      setActionError(
+        e instanceof Error ? e.message : "Could not build download"
+      );
+    } finally {
+      setDownloadingZip(false);
+    }
+  }
+
   if (loading && !job) {
     return (
       <div className="flex min-h-[40vh] items-center justify-center text-zinc-500">
@@ -301,34 +354,65 @@ export function PhotographerBoard({ slug }: { slug: string }) {
         <h2 className="text-lg font-medium text-white">Selected images</h2>
 
         {job.selections.length > 0 && (
-          <div className="mt-4 flex flex-col gap-3 rounded-xl border border-zinc-800 bg-zinc-900/30 p-4 sm:flex-row sm:flex-wrap sm:items-end">
-            <p className="text-sm text-zinc-400">
-              <span className="font-medium text-zinc-200">
-                {selectedIds.size}
-              </span>{" "}
-              selected — move many at once:
+          <div className="mt-4 space-y-3 rounded-xl border border-zinc-800 bg-zinc-900/30 p-4">
+            <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-end">
+              <p className="text-sm text-zinc-400">
+                <span className="font-medium text-zinc-200">
+                  {selectedIds.size}
+                </span>{" "}
+                selected — move or download:
+              </p>
+              <select
+                value={bulkFolderId}
+                onChange={(e) => setBulkFolderId(e.target.value)}
+                disabled={busy || downloadingZip}
+                className="rounded-lg border border-zinc-700 bg-zinc-900 px-3 py-2 text-sm text-zinc-200 focus:border-emerald-600 focus:outline-none"
+              >
+                <option value="">Unsorted</option>
+                {foldersSorted.map((f) => (
+                  <option key={f.id} value={f.id}>
+                    {f.name}
+                  </option>
+                ))}
+              </select>
+              <button
+                type="button"
+                disabled={busy || downloadingZip || selectedIds.size === 0}
+                onClick={() => void bulkMoveToFolder()}
+                className="rounded-xl bg-emerald-700 px-4 py-2 text-sm font-medium text-white hover:bg-emerald-600 disabled:opacity-40"
+              >
+                Move selected
+              </button>
+              <button
+                type="button"
+                disabled={busy || downloadingZip || selectedIds.size === 0}
+                onClick={() =>
+                  void downloadZip([...selectedIds])
+                }
+                className="rounded-xl border border-amber-600/60 bg-amber-950/40 px-4 py-2 text-sm font-medium text-amber-100 hover:bg-amber-950/70 disabled:opacity-40"
+              >
+                {downloadingZip ? "Preparing ZIP…" : "Download selected (ZIP)"}
+              </button>
+              <button
+                type="button"
+                disabled={
+                  busy ||
+                  downloadingZip ||
+                  job.selections.length === 0
+                }
+                onClick={() =>
+                  void downloadZip(job.selections.map((s) => s.id))
+                }
+                className="rounded-xl border border-zinc-600 px-4 py-2 text-sm font-medium text-zinc-200 hover:bg-zinc-800 disabled:opacity-40"
+              >
+                Download all (ZIP)
+              </button>
+            </div>
+            <p className="text-xs text-zinc-600">
+              ZIP is built from your Google Drive files (up to 60 files, ~95 MiB
+              total). Requires your Google account to still have access to the
+              gallery folder.
             </p>
-            <select
-              value={bulkFolderId}
-              onChange={(e) => setBulkFolderId(e.target.value)}
-              disabled={busy}
-              className="rounded-lg border border-zinc-700 bg-zinc-900 px-3 py-2 text-sm text-zinc-200 focus:border-emerald-600 focus:outline-none"
-            >
-              <option value="">Unsorted</option>
-              {foldersSorted.map((f) => (
-                <option key={f.id} value={f.id}>
-                  {f.name}
-                </option>
-              ))}
-            </select>
-            <button
-              type="button"
-              disabled={busy || selectedIds.size === 0}
-              onClick={() => void bulkMoveToFolder()}
-              className="rounded-xl bg-emerald-700 px-4 py-2 text-sm font-medium text-white hover:bg-emerald-600 disabled:opacity-40"
-            >
-              Move selected
-            </button>
           </div>
         )}
 
@@ -341,7 +425,7 @@ export function PhotographerBoard({ slug }: { slug: string }) {
                     type="checkbox"
                     checked={allSelected}
                     onChange={toggleSelectAll}
-                    disabled={busy || selectionIds.length === 0}
+                    disabled={busy || downloadingZip || selectionIds.length === 0}
                     title="Select all"
                     className="rounded border-zinc-600 bg-zinc-900"
                   />
@@ -360,7 +444,7 @@ export function PhotographerBoard({ slug }: { slug: string }) {
                       type="checkbox"
                       checked={selectedIds.has(file.id)}
                       onChange={() => toggleSelect(file.id)}
-                      disabled={busy}
+                      disabled={busy || downloadingZip}
                       aria-label={`Select ${file.name}`}
                       className="rounded border-zinc-600 bg-zinc-900"
                     />
@@ -391,7 +475,7 @@ export function PhotographerBoard({ slug }: { slug: string }) {
                   </td>
                   <td className="px-4 py-3">
                     <select
-                      disabled={busy}
+                      disabled={busy || downloadingZip}
                       value={file.folderId ?? ""}
                       onChange={(e) => {
                         const v = e.target.value;

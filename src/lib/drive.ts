@@ -216,3 +216,131 @@ export function isFolder(mimeType?: string | null) {
 export function isImageMime(mimeType?: string | null) {
   return !!mimeType?.startsWith("image/");
 }
+
+export async function getPhotographerDriveAccessToken(
+  photographerUserId: string
+): Promise<string> {
+  const account = await loadGoogleAccount(photographerUserId);
+  return getValidAccessToken(account);
+}
+
+/** Metadata for a Drive file (download / scope checks). */
+export async function getDriveFileMeta(
+  accessToken: string,
+  fileId: string
+): Promise<{
+  id: string;
+  name: string;
+  mimeType: string;
+  parents?: string[];
+  size?: string;
+}> {
+  const url = new URL(
+    `https://www.googleapis.com/drive/v3/files/${encodeURIComponent(fileId)}`
+  );
+  url.searchParams.set("fields", "id,name,mimeType,parents,size");
+  url.searchParams.set("supportsAllDrives", "true");
+  return driveJson(url.toString(), accessToken);
+}
+
+/**
+ * Ensures the file lives under the job root folder (same scope as browse).
+ */
+export async function assertDriveFileInJobTree(
+  accessToken: string,
+  driveFileId: string,
+  rootFolderId: string
+): Promise<{ name: string; mimeType: string; size?: string }> {
+  const meta = await getDriveFileMeta(accessToken, driveFileId);
+  if (meta.mimeType === "application/vnd.google-apps.folder") {
+    throw new Error("Cannot download a folder");
+  }
+  const parents = meta.parents ?? [];
+  let ok = false;
+  for (const p of parents) {
+    if (p === rootFolderId) {
+      ok = true;
+      break;
+    }
+    if (await isFolderUnderRoot(accessToken, p, rootFolderId)) {
+      ok = true;
+      break;
+    }
+  }
+  if (!ok) {
+    throw new Error("File is outside this job’s Drive folder.");
+  }
+  return { name: meta.name, mimeType: meta.mimeType, size: meta.size };
+}
+
+/** Raw bytes for a Drive file (binary or exported Google Workspace file). */
+export async function fetchDriveFileBytes(
+  accessToken: string,
+  fileId: string,
+  mimeType: string
+): Promise<Uint8Array> {
+  if (mimeType === "application/vnd.google-apps.folder") {
+    throw new Error("Cannot download folders");
+  }
+  const googleApps =
+    mimeType.startsWith("application/vnd.google-apps.") &&
+    mimeType !== "application/vnd.google-apps.folder";
+
+  if (googleApps) {
+    let exportMime = "application/pdf";
+    if (mimeType === "application/vnd.google-apps.spreadsheet") {
+      exportMime =
+        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
+    } else if (mimeType === "application/vnd.google-apps.presentation") {
+      exportMime = "application/pdf";
+    } else if (mimeType === "application/vnd.google-apps.drawing") {
+      exportMime = "image/png";
+    } else if (mimeType === "application/vnd.google-apps.document") {
+      exportMime = "application/pdf";
+    }
+    const url = new URL(
+      `https://www.googleapis.com/drive/v3/files/${encodeURIComponent(fileId)}/export`
+    );
+    url.searchParams.set("mimeType", exportMime);
+    const res = await fetch(url.toString(), {
+      headers: { Authorization: `Bearer ${accessToken}` },
+    });
+    if (!res.ok) {
+      const t = await res.text();
+      throw new Error(
+        `Drive export failed (${res.status}): ${t.slice(0, 160)}`
+      );
+    }
+    return new Uint8Array(await res.arrayBuffer());
+  }
+
+  const url = new URL(
+    `https://www.googleapis.com/drive/v3/files/${encodeURIComponent(fileId)}`
+  );
+  url.searchParams.set("alt", "media");
+  url.searchParams.set("supportsAllDrives", "true");
+  const res = await fetch(url.toString(), {
+    headers: { Authorization: `Bearer ${accessToken}` },
+  });
+  if (!res.ok) {
+    const t = await res.text();
+    throw new Error(
+      `Drive download failed (${res.status}): ${t.slice(0, 160)}`
+    );
+  }
+  return new Uint8Array(await res.arrayBuffer());
+}
+
+/** Safe filename inside a ZIP (preserves extension when missing). */
+export function zipEntryFilename(originalName: string, mimeType: string): string {
+  const cleaned = originalName.replace(/[/\\?*:|"<>]/g, "_").trim() || "file";
+  const capped = cleaned.slice(0, 160);
+  if (/\.[a-zA-Z0-9]{2,8}$/.test(capped)) return capped;
+  if (mimeType.startsWith("image/jpeg")) return `${capped}.jpg`;
+  if (mimeType.startsWith("image/png")) return `${capped}.png`;
+  if (mimeType.startsWith("image/webp")) return `${capped}.webp`;
+  if (mimeType.startsWith("image/gif")) return `${capped}.gif`;
+  if (mimeType.startsWith("video/")) return `${capped}.mp4`;
+  if (mimeType === "application/pdf") return `${capped}.pdf`;
+  return capped;
+}
