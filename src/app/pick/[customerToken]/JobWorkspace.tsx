@@ -37,6 +37,12 @@ function isImage(entry: { mimeType?: string | null; name?: string | null }) {
   return /\.(jpe?g|png|webp|gif|bmp|tiff?|heic|heif|avif)$/i.test(name);
 }
 
+function entryPreviewSrc(customerToken: string, entry: DriveEntry): string | null {
+  if (entry.thumbnailLink) return entry.thumbnailLink;
+  if (!isImage(entry)) return null;
+  return `/api/pick/${encodeURIComponent(customerToken)}/preview?fileId=${encodeURIComponent(entry.id)}`;
+}
+
 export function JobWorkspace({ customerToken }: { customerToken: string }) {
   const [rootFolderId, setRootFolderId] = useState<string | null>(null);
   const [crumbs, setCrumbs] = useState<Crumb[]>([]);
@@ -371,6 +377,7 @@ export function JobWorkspace({ customerToken }: { customerToken: string }) {
         {visibleEntries.map((entry) => {
           const folder = isFolder(entry.mimeType);
           const picked = !folder && !!selected[entry.id];
+          const previewSrc = folder ? null : entryPreviewSrc(customerToken, entry);
           return (
             <button
               key={entry.id}
@@ -391,10 +398,10 @@ export function JobWorkspace({ customerToken }: { customerToken: string }) {
                   <div className="flex h-full items-center justify-center text-4xl">
                     📁
                   </div>
-                ) : entry.thumbnailLink ? (
+                ) : previewSrc ? (
                   // eslint-disable-next-line @next/next/no-img-element
                   <img
-                    src={entry.thumbnailLink}
+                    src={previewSrc}
                     alt=""
                     className="h-full w-full object-cover"
                   />
