@@ -8,6 +8,11 @@ const globalForPrisma = globalThis as unknown as {
   neonWsConfigured: boolean | undefined;
 };
 
+function isCloudflareWorkerRuntime(): boolean {
+  // `WebSocketPair` is specific to Cloudflare Workers runtime.
+  return typeof (globalThis as { WebSocketPair?: unknown }).WebSocketPair !== "undefined";
+}
+
 /**
  * Neon HTTP adapter (`PrismaNeonHTTP`) rejects transactions — Prisma then fails with
  * "Transactions are not supported in HTTP mode" on many writes (e.g. upsert).
@@ -41,6 +46,11 @@ function createPrismaClient(): PrismaClient {
 }
 
 function getPrisma(): PrismaClient {
+  if (isCloudflareWorkerRuntime()) {
+    // Avoid sharing Neon/Prisma connection objects across requests in Workers.
+    // Cross-request reuse can trigger "Cannot perform I/O on behalf of a different request".
+    return createPrismaClient();
+  }
   if (!globalForPrisma.prisma) {
     globalForPrisma.prisma = createPrismaClient();
   }
