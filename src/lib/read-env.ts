@@ -1,13 +1,15 @@
 /**
- * Read `process.env` at call time. Next/Webpack can inline `process.env.KEY` from the **build**
- * host's environment, which breaks Cloudflare when compile has secrets but page-data workers do not.
+ * Read `process.env` at call time using a **dynamic** key so Next/Webpack does not inline
+ * `process.env.KEY` from the build host (which breaks Cloudflare when secrets exist only at runtime).
+ *
+ * Uses `Reflect.get` (not `new Function`) so restricted Workers / edge runtimes do not reject eval-like code.
  */
 export function readProcessEnv(name: string): string | undefined {
-  const fn = new Function(`
-    var v = typeof process !== "undefined" && process.env
-      ? process.env[${JSON.stringify(name)}]
-      : undefined;
+  try {
+    if (typeof process === "undefined" || !process.env) return undefined;
+    const v = Reflect.get(process.env, name);
     return typeof v === "string" ? v : undefined;
-  `) as () => string | undefined;
-  return fn();
+  } catch {
+    return undefined;
+  }
 }
