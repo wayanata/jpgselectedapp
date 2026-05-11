@@ -5,7 +5,10 @@
   "name": "jpgselectedapp",
   "main": ".open-next/worker.js",
   "compatibility_date": "2026-05-10",
-  "compatibility_flags": ["nodejs_compat"],
+  "compatibility_flags": [
+    "nodejs_compat",
+    "no_handle_cross_request_promise_resolution"
+  ],
   // Prisma `engineType = "client"` + wasm compiler. Keep `CompiledWasm` + `**/*.wasm`.
   // `scripts/prune-prisma-worker-wasm.mjs` removes unused `query_engine_bg.*` after build.
   // @see https://developers.cloudflare.com/workers/wrangler/configuration/#find-additional-modules
