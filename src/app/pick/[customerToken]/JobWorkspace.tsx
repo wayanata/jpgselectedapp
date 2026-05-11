@@ -31,8 +31,10 @@ function isFolder(mime?: string | null) {
   return mime === "application/vnd.google-apps.folder";
 }
 
-function isImage(mime?: string | null) {
-  return !!mime?.startsWith("image/");
+function isImage(entry: { mimeType?: string | null; name?: string | null }) {
+  if (entry.mimeType?.startsWith("image/")) return true;
+  const name = entry.name?.toLowerCase() ?? "";
+  return /\.(jpe?g|png|webp|gif|bmp|tiff?|heic|heif|avif)$/i.test(name);
 }
 
 export function JobWorkspace({ customerToken }: { customerToken: string }) {
@@ -151,7 +153,7 @@ export function JobWorkspace({ customerToken }: { customerToken: string }) {
     return entries.filter((e) => {
       if (isFolder(e.mimeType)) return true;
       if (!imagesOnly) return true;
-      return isImage(e.mimeType);
+      return isImage(e);
     });
   }, [entries, imagesOnly]);
 
