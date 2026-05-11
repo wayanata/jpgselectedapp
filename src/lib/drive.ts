@@ -1,10 +1,13 @@
 import { prisma } from "@/lib/prisma";
+import { readProcessEnv } from "@/lib/read-env";
 
 function oauthCredentials() {
   const clientId =
-    process.env.GOOGLE_CLIENT_ID ?? process.env.AUTH_GOOGLE_ID ?? "";
+    readProcessEnv("GOOGLE_CLIENT_ID") ?? readProcessEnv("AUTH_GOOGLE_ID") ?? "";
   const clientSecret =
-    process.env.GOOGLE_CLIENT_SECRET ?? process.env.AUTH_GOOGLE_SECRET ?? "";
+    readProcessEnv("GOOGLE_CLIENT_SECRET") ??
+    readProcessEnv("AUTH_GOOGLE_SECRET") ??
+    "";
   if (!clientId || !clientSecret) {
     throw new Error("Missing GOOGLE_CLIENT_ID / GOOGLE_CLIENT_SECRET");
   }

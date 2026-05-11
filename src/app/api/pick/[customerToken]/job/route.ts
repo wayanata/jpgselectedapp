@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { getPublicOrigin } from "@/lib/public-origin";
 
 export async function GET(
   _req: Request,
@@ -22,11 +23,7 @@ export async function GET(
     return NextResponse.json({ error: "Not found" }, { status: 404 });
   }
 
-  const origin =
-    process.env.AUTH_URL ??
-    process.env.NEXTAUTH_URL ??
-    "http://localhost:3000";
-  const base = origin.replace(/\/$/, "");
+  const base = getPublicOrigin();
 
   return NextResponse.json({
     job,
