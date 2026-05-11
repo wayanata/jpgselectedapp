@@ -13,27 +13,21 @@ const globalForPrisma = globalThis as unknown as {
  * "Transactions are not supported in HTTP mode" on many writes (e.g. upsert).
  * WebSocket `Pool` supports transactions and matches Neon’s guidance for Workers.
  *
- * Cloudflare Workers expose global `WebSocket`. Older Node.js releases may not;
- * we fall back to the optional `ws` package for local `next dev`.
+ * Cloudflare Workers expose global `WebSocket`. Do not `require("ws")` here: bundlers
+ * may pull `ws` into the Worker bundle; it depends on Node `net`/`tls` and crashes
+ * the Worker at startup (Cloudflare 1101).
+ *
+ * Local `next dev`: use Node.js 22+ (global WebSocket), or run against Workers preview.
  */
 function configureNeonWebSocketsOnce(): void {
   if (globalForPrisma.neonWsConfigured) return;
   globalForPrisma.neonWsConfigured = true;
-  if (typeof globalThis.WebSocket === "function") {
-    neonConfig.webSocketConstructor = globalThis.WebSocket;
-    return;
-  }
-  try {
-    // Older Node (local `next dev`): no global WebSocket — use `ws` package.
-    // eslint-disable-next-line @typescript-eslint/no-require-imports
-    const { WebSocket: NodeWs } = require("ws") as typeof import("ws");
-    neonConfig.webSocketConstructor =
-      NodeWs as unknown as typeof globalThis.WebSocket;
-  } catch {
+  if (typeof globalThis.WebSocket !== "function") {
     throw new Error(
-      "Neon driver needs WebSockets. Cloudflare Workers provide global WebSocket. For local development use Node.js 22+, or run npm install ws."
+      "Neon Pool requires global WebSocket. Use Node.js 22+ for local development, or deploy to Cloudflare Workers."
     );
   }
+  neonConfig.webSocketConstructor = globalThis.WebSocket;
 }
 
 function createPrismaClient(): PrismaClient {
