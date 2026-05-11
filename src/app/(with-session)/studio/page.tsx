@@ -138,7 +138,11 @@ export default function StudioPage() {
         </p>
         <button
           type="button"
-          onClick={() => signIn("google")}
+          onClick={() =>
+            void signIn("google", {
+              callbackUrl: "/studio",
+            })
+          }
           className="mt-8 rounded-xl bg-white px-5 py-3 text-sm font-medium text-zinc-900 shadow hover:bg-zinc-100"
         >
           Continue with Google
