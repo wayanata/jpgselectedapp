@@ -7,19 +7,20 @@ function logAuthFailure(method: string, err: unknown) {
 }
 
 function authErrorBody(err: unknown) {
+  const message = err instanceof Error ? err.message : String(err);
   const base = {
     error:
       "Authentication handler failed. Inspect Worker logs (e.g. npx wrangler tail) and verify AUTH_SECRET, AUTH_URL, and Google OAuth variables on the Worker.",
+    /** Safe to share: exception message only (no stack). */
+    cause: message,
   };
   if (readProcessEnv("DEBUG_AUTH_ENV") !== "1") {
     return base;
   }
-  const message = err instanceof Error ? err.message : String(err);
   const stack = err instanceof Error ? err.stack : undefined;
   return {
     ...base,
     debug: {
-      message,
       stack,
       hint:
         message.includes("URL") || message.includes("Invalid URL")

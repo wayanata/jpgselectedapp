@@ -3,6 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
+    "postinstall": "patch-package",
     "dev": "next dev",
     "build": "prisma generate && next build --webpack",
     "build:cloudflare": "prisma generate && npx opennextjs-cloudflare build && node scripts/strip-sourcemaps.mjs && node scripts/prune-prisma-worker-wasm.mjs && node scripts/assert-wrangler-prisma-wasm.mjs",
@@ -36,6 +37,7 @@
     "@types/react-dom": "^19",
     "eslint": "^9",
     "eslint-config-next": "16.2.6",
+    "patch-package": "^8.0.1",
     "prisma": "^6.5.0",
     "tailwindcss": "^4",
     "typescript": "^5",
