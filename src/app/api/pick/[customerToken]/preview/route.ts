@@ -59,10 +59,7 @@ export async function GET(
     }
 
     const bytes = await fetchDriveFileBytes(accessToken, fileId, meta.mimeType);
-    const body = bytes.buffer.slice(
-      bytes.byteOffset,
-      bytes.byteOffset + bytes.byteLength
-    );
+    const body = new Blob([bytes], { type: contentType });
     return new NextResponse(body, {
       status: 200,
       headers: {
