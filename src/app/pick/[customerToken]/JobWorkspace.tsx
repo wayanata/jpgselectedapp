@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { readJsonResponse } from "@/lib/read-json-response";
 
 type DriveEntry = {
   id: string;
@@ -64,11 +65,27 @@ export function JobWorkspace({ customerToken }: { customerToken: string }) {
     setLoadingJob(true);
     try {
       const res = await fetch(`/api/pick/${customerToken}/job`);
-      if (!res.ok) throw new Error("Could not load job");
-      const data = await res.json();
+      const data = await readJsonResponse<{
+        error?: string;
+        job?: {
+          title: string;
+          selections?: Array<{
+            driveFileId: string;
+            name: string;
+            mimeType?: string | null;
+            thumbnailLink?: string | null;
+            webViewLink?: string | null;
+            iconLink?: string | null;
+          }>;
+        };
+        photographerUrl?: string | null;
+        driveFolderId?: string;
+      }>(res);
+      if (!res.ok) throw new Error(data.error ?? "Could not load job");
+      if (!data.job) throw new Error("Invalid response");
       setJobTitle(data.job.title);
-      setPhotographerUrl(data.photographerUrl);
-      setRootFolderId(data.driveFolderId);
+      setPhotographerUrl(data.photographerUrl ?? null);
+      setRootFolderId(data.driveFolderId ?? null);
       const next: SelectedMap = {};
       for (const s of data.job.selections ?? []) {
         next[s.driveFileId] = {
@@ -104,7 +121,11 @@ export function JobWorkspace({ customerToken }: { customerToken: string }) {
         });
         if (token) params.set("pageToken", token);
         const res = await fetch(`/api/drive/browse?${params}`);
-        const data = await res.json();
+        const data = await readJsonResponse<{
+          error?: string;
+          files?: DriveEntry[];
+          nextPageToken?: string;
+        }>(res);
         if (!res.ok) throw new Error(data.error ?? "Drive request failed");
         const files = (data.files ?? []) as DriveEntry[];
         setEntries((prev) => (token ? [...prev, ...files] : files));
@@ -147,7 +168,10 @@ export function JobWorkspace({ customerToken }: { customerToken: string }) {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ files }),
       });
-      const data = await res.json();
+      const data = await readJsonResponse<{
+        error?: string;
+        selections?: unknown[];
+      }>(res);
       if (!res.ok) throw new Error(data.error ?? "Save failed");
       const n = data.selections?.length ?? files.length;
       setSaveFeedback({

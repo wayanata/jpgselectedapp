@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { readJsonResponse } from "@/lib/read-json-response";
 
 type Folder = {
   id: string;
@@ -44,8 +45,9 @@ export function PhotographerBoard({ slug }: { slug: string }) {
     setLoadError(null);
     try {
       const res = await fetch(`/api/public/jobs/${slug}`);
-      const data = await res.json();
+      const data = await readJsonResponse<{ error?: string; job?: Job }>(res);
       if (!res.ok) throw new Error(data.error ?? "Not found");
+      if (!data.job) throw new Error("Invalid response");
       setJob(data.job);
     } catch (e) {
       setLoadError(e instanceof Error ? e.message : "Error");
@@ -102,7 +104,10 @@ export function PhotographerBoard({ slug }: { slug: string }) {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ name: newFolder.trim() }),
       });
-      const data = await res.json();
+      const data = await readJsonResponse<{
+        error?: string;
+        folder?: { name: string };
+      }>(res);
       if (!res.ok) throw new Error(data.error ?? "Failed");
       setNewFolder("");
       await load();
@@ -126,7 +131,9 @@ export function PhotographerBoard({ slug }: { slug: string }) {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ selectedFileId: fileId, folderId }),
       });
-      const data = await res.json();
+      const data = await readJsonResponse<{ error?: string; file: SelFile }>(
+        res
+      );
       if (!res.ok) throw new Error(data.error ?? "Failed");
       setJob((prev) => {
         if (!prev) return prev;
@@ -150,18 +157,19 @@ export function PhotographerBoard({ slug }: { slug: string }) {
     setActionError(null);
     setActionSuccess(null);
     try {
-      const results = await Promise.all(
-        ids.map(async (fileId) => {
-          const res = await fetch(`/api/public/jobs/${slug}/assign`, {
-            method: "PATCH",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ selectedFileId: fileId, folderId }),
-          });
-          const data = await res.json();
-          if (!res.ok) throw new Error(data.error ?? "Failed");
-          return data.file as SelFile;
-        })
-      );
+      const results: SelFile[] = [];
+      for (const fileId of ids) {
+        const res = await fetch(`/api/public/jobs/${slug}/assign`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ selectedFileId: fileId, folderId }),
+        });
+        const data = await readJsonResponse<{ error?: string; file: SelFile }>(
+          res
+        );
+        if (!res.ok) throw new Error(data.error ?? "Failed");
+        results.push(data.file);
+      }
       const byId = new Map(results.map((f) => [f.id, f]));
       setJob((prev) => {
         if (!prev) return prev;
