@@ -227,7 +227,7 @@ export function JobWorkspace({ customerToken }: { customerToken: string }) {
 
   if (loadingJob) {
     return (
-      <div className="flex min-h-[40vh] items-center justify-center text-zinc-500">
+      <div className="flex min-h-[40vh] items-center justify-center text-stone-500">
         Loading job…
       </div>
     );
@@ -239,12 +239,12 @@ export function JobWorkspace({ customerToken }: { customerToken: string }) {
         <div>
           <Link
             href="/"
-            className="text-sm text-zinc-500 hover:text-zinc-300"
+            className="text-sm text-stone-500 hover:text-stone-700"
           >
             ← Home
           </Link>
-          <h1 className="mt-3 text-2xl font-semibold text-white">{jobTitle}</h1>
-          <p className="mt-2 max-w-xl text-sm text-zinc-400">
+          <h1 className="mt-3 text-2xl font-semibold text-stone-900">{jobTitle}</h1>
+          <p className="mt-2 max-w-xl text-sm text-stone-600">
             Browse the gallery folder your photographer set up. Tap thumbnails to
             select images, then save. No Google sign-in required on your side.
           </p>
@@ -264,10 +264,10 @@ export function JobWorkspace({ customerToken }: { customerToken: string }) {
       {jobLocked && (
         <div
           role="status"
-          className="mt-6 rounded-xl border border-amber-800/60 bg-amber-950/35 px-4 py-3 text-sm text-amber-100"
+          className="mt-6 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-950"
         >
           <p className="font-medium">This job is closed</p>
-          <p className="mt-1 text-amber-100/90">
+          <p className="mt-1 text-amber-900">
             Your photographer marked this session finished. You can still browse
             the gallery, but you can&apos;t change your selection.
           </p>
@@ -281,8 +281,8 @@ export function JobWorkspace({ customerToken }: { customerToken: string }) {
           aria-live="polite"
           className={`mt-6 rounded-xl border px-4 py-4 text-sm ${
             saveFeedback.kind === "success"
-              ? "border-emerald-700/70 bg-emerald-950/50 text-emerald-100"
-              : "border-red-800/70 bg-red-950/40 text-red-100"
+              ? "border-emerald-200 bg-emerald-50 text-emerald-950"
+              : "border-red-200 bg-red-50 text-red-950"
           }`}
         >
           <p className="font-medium">
@@ -300,17 +300,17 @@ export function JobWorkspace({ customerToken }: { customerToken: string }) {
       )}
 
       {photographerUrl && (
-        <div className="mt-8 rounded-xl border border-zinc-800 bg-zinc-900/50 p-4">
-          <p className="text-xs font-medium uppercase tracking-wide text-zinc-500">
+        <div className="mt-8 rounded-xl border border-stone-200 bg-white/80 p-4 shadow-sm">
+          <p className="text-xs font-medium uppercase tracking-wide text-stone-500">
             Photographer review link
           </p>
           <div className="mt-2 flex flex-wrap items-center gap-2">
-            <code className="break-all rounded-lg bg-zinc-950 px-3 py-2 text-sm text-amber-200/90">
+            <code className="break-all rounded-lg bg-stone-100 px-3 py-2 text-sm text-amber-900">
               {photographerUrl}
             </code>
             <button
               type="button"
-              className="rounded-lg border border-zinc-700 px-3 py-2 text-xs text-zinc-300 hover:bg-zinc-800"
+              className="rounded-lg border border-stone-300 px-3 py-2 text-xs text-stone-700 hover:bg-stone-100"
               onClick={() =>
                 navigator.clipboard.writeText(photographerUrl).catch(() => {})
               }
@@ -318,31 +318,31 @@ export function JobWorkspace({ customerToken }: { customerToken: string }) {
               Copy
             </button>
           </div>
-          <p className="mt-2 text-xs text-zinc-500">
+          <p className="mt-2 text-xs text-stone-500">
             Send this to your photographer when you&apos;re ready — they sort picks
             without needing your Google account.
           </p>
         </div>
       )}
 
-      <div className="mt-10 flex flex-wrap items-center gap-3 border-b border-zinc-800 pb-4">
-        <span className="text-sm text-zinc-500">Path:</span>
+      <div className="mt-10 flex flex-wrap items-center gap-3 border-b border-stone-200 pb-4">
+        <span className="text-sm text-stone-500">Path:</span>
         <button
           type="button"
-          className="text-sm text-amber-400/90 hover:underline"
+          className="text-sm text-amber-800 hover:underline"
           onClick={() => setCrumbs([])}
         >
           Gallery folder
         </button>
         {crumbs.map((c, i) => (
           <span key={c.id} className="flex items-center gap-2 text-sm">
-            <span className="text-zinc-600">/</span>
+            <span className="text-stone-400">/</span>
             <button
               type="button"
               className={
                 i === crumbs.length - 1
-                  ? "text-white"
-                  : "text-zinc-400 hover:text-white"
+                  ? "text-stone-900"
+                  : "text-stone-600 hover:text-stone-900"
               }
               onClick={() => setCrumbs((prev) => prev.slice(0, i + 1))}
             >
@@ -353,22 +353,22 @@ export function JobWorkspace({ customerToken }: { customerToken: string }) {
       </div>
 
       <div className="mt-4 flex flex-wrap items-center gap-4">
-        <label className="flex cursor-pointer items-center gap-2 text-sm text-zinc-400">
+        <label className="flex cursor-pointer items-center gap-2 text-sm text-stone-600">
           <input
             type="checkbox"
             checked={imagesOnly}
             onChange={(e) => setImagesOnly(e.target.checked)}
-            className="rounded border-zinc-600 bg-zinc-900"
+            className="rounded border-stone-400 bg-white"
           />
           Hide non-images in this folder
         </label>
         {loadingDrive && (
-          <span className="text-sm text-zinc-600">Loading…</span>
+          <span className="text-sm text-stone-500">Loading…</span>
         )}
       </div>
 
       {driveError && (
-        <p className="mt-4 rounded-lg border border-red-900/50 bg-red-950/30 px-4 py-3 text-sm text-red-200">
+        <p className="mt-4 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-900">
           {driveError}
         </p>
       )}
@@ -390,10 +390,10 @@ export function JobWorkspace({ customerToken }: { customerToken: string }) {
               className={`group flex flex-col overflow-hidden rounded-xl border text-left transition ${
                 picked
                   ? "border-amber-500 ring-1 ring-amber-500/40"
-                  : "border-zinc-800 hover:border-zinc-600"
+                  : "border-stone-200 hover:border-stone-400"
               } ${jobLocked && !folder ? "cursor-not-allowed opacity-90" : ""}`}
             >
-              <div className="relative aspect-square bg-zinc-900">
+              <div className="relative aspect-square bg-stone-100">
                 {folder ? (
                   <div className="flex h-full items-center justify-center text-4xl">
                     📁
@@ -406,7 +406,7 @@ export function JobWorkspace({ customerToken }: { customerToken: string }) {
                     className="h-full w-full object-cover"
                   />
                 ) : (
-                  <div className="flex h-full items-center justify-center text-xs text-zinc-600">
+                  <div className="flex h-full items-center justify-center text-xs text-stone-500">
                     No preview
                   </div>
                 )}
@@ -415,19 +415,19 @@ export function JobWorkspace({ customerToken }: { customerToken: string }) {
                     className={`absolute right-2 top-2 flex h-7 w-7 items-center justify-center rounded-full text-sm font-bold ${
                       picked
                         ? "bg-amber-500 text-zinc-950"
-                        : "border border-zinc-600 bg-zinc-950/80 text-zinc-400"
+                        : "border border-stone-300 bg-white/95 text-stone-500"
                     }`}
                   >
                     {picked ? "✓" : "+"}
                   </span>
                 )}
               </div>
-              <div className="border-t border-zinc-800 p-2">
-                <p className="truncate text-xs font-medium text-zinc-200">
+              <div className="border-t border-stone-200 bg-white/90 p-2">
+                <p className="truncate text-xs font-medium text-stone-800">
                   {entry.name}
                 </p>
                 {folder && (
-                  <p className="text-[10px] text-zinc-500">Open folder</p>
+                  <p className="text-[10px] text-stone-500">Open folder</p>
                 )}
               </div>
             </button>
@@ -441,7 +441,7 @@ export function JobWorkspace({ customerToken }: { customerToken: string }) {
             type="button"
             disabled={loadingDrive}
             onClick={() => fetchPage(listToken)}
-            className="rounded-xl border border-zinc-700 px-6 py-2 text-sm text-zinc-300 hover:bg-zinc-800 disabled:opacity-50"
+            className="rounded-xl border border-stone-300 px-6 py-2 text-sm text-stone-700 hover:bg-stone-100 disabled:opacity-50"
           >
             Load more in this folder
           </button>

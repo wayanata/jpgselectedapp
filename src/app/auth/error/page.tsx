@@ -54,11 +54,11 @@ function AuthErrorContent() {
   }, [code]);
 
   return (
-    <main className="mx-auto max-w-lg px-6 py-20 text-zinc-100">
+    <main className="mx-auto max-w-lg px-6 py-20 text-stone-900">
       <h1 className="text-2xl font-semibold">{title}</h1>
-      <p className="mt-4 text-zinc-400">{body}</p>
-      <p className="mt-6 text-xs text-zinc-600">
-        Error code: <code className="text-zinc-500">{code}</code>
+      <p className="mt-4 text-stone-600">{body}</p>
+      <p className="mt-6 text-xs text-stone-500">
+        Error code: <code className="text-stone-700">{code}</code>
       </p>
       <Link
         href="/studio"
@@ -74,7 +74,7 @@ export default function AuthErrorPage() {
   return (
     <Suspense
       fallback={
-        <div className="flex min-h-[40vh] items-center justify-center text-zinc-500">
+        <div className="flex min-h-[40vh] items-center justify-center text-stone-500">
           Loading…
         </div>
       }

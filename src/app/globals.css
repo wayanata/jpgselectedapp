@@ -1,8 +1,9 @@
 @import "tailwindcss";
 
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  /* Warm cream page background */
+  --background: #faf6ef;
+  --foreground: #1c1917;
 }
 
 @theme inline {
@@ -14,8 +15,9 @@
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
+    /* Keep cream (slightly deeper) even in OS dark mode — app is light-themed */
+    --background: #f3ebe0;
+    --foreground: #1c1917;
   }
 }
 

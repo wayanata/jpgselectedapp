@@ -121,7 +121,7 @@ export default function StudioPage() {
 
   if (status === "loading") {
     return (
-      <div className="flex min-h-[50vh] items-center justify-center text-zinc-500">
+      <div className="flex min-h-[50vh] items-center justify-center text-stone-500">
         Loading…
       </div>
     );
@@ -130,8 +130,8 @@ export default function StudioPage() {
   if (!session?.user) {
     return (
       <main className="mx-auto max-w-lg px-6 py-20">
-        <h1 className="text-2xl font-semibold text-white">Photographer studio</h1>
-        <p className="mt-3 text-zinc-400">
+        <h1 className="text-2xl font-semibold text-stone-900">Photographer studio</h1>
+        <p className="mt-3 text-stone-600">
           Sign in with the Google account that owns your Drive galleries. You
           connect once here; clients only need the pick link you send them — no
           Google login on their side.
@@ -155,18 +155,18 @@ export default function StudioPage() {
     <main className="mx-auto max-w-3xl px-6 py-12">
       <div className="flex flex-wrap items-center justify-between gap-4">
         <div>
-          <Link href="/" className="text-sm text-zinc-500 hover:text-zinc-300">
+          <Link href="/" className="text-sm text-stone-500 hover:text-stone-700">
             ← Home
           </Link>
-          <h1 className="mt-2 text-2xl font-semibold text-white">Studio</h1>
-          <p className="mt-1 text-sm text-zinc-500">
+          <h1 className="mt-2 text-2xl font-semibold text-stone-900">Studio</h1>
+          <p className="mt-1 text-sm text-stone-500">
             Signed in as {session.user.email}
           </p>
         </div>
         <button
           type="button"
           onClick={() => signOut({ callbackUrl: "/" })}
-          className="text-sm text-zinc-500 hover:text-zinc-300"
+          className="text-sm text-stone-500 hover:text-stone-700"
         >
           Sign out
         </button>
@@ -174,28 +174,28 @@ export default function StudioPage() {
 
       <form
         onSubmit={createJob}
-        className="mt-10 rounded-xl border border-zinc-800 bg-zinc-900/40 p-6"
+        className="mt-10 rounded-xl border border-stone-200 bg-white/80 p-6 shadow-sm"
       >
-        <h2 className="text-lg font-medium text-white">New selection job</h2>
-        <p className="mt-2 text-sm text-zinc-500">
+        <h2 className="text-lg font-medium text-stone-900">New selection job</h2>
+        <p className="mt-2 text-sm text-stone-500">
           Paste your Google Drive folder link (or the folder ID). Clients will
           browse inside this folder only.
         </p>
-        <label className="mt-4 block text-sm text-zinc-400">
+        <label className="mt-4 block text-sm text-stone-600">
           Title
           <input
             value={title}
             onChange={(e) => setTitle(e.target.value)}
-            className="mt-1 w-full rounded-lg border border-zinc-700 bg-zinc-950 px-3 py-2 text-white"
+            className="mt-1 w-full rounded-lg border border-stone-300 bg-white px-3 py-2 text-stone-900"
           />
         </label>
-        <label className="mt-4 block text-sm text-zinc-400">
+        <label className="mt-4 block text-sm text-stone-600">
           Drive folder URL or ID
           <input
             value={driveFolderId}
             onChange={(e) => setDriveFolderId(e.target.value)}
             placeholder="https://drive.google.com/drive/folders/…"
-            className="mt-1 w-full rounded-lg border border-zinc-700 bg-zinc-950 px-3 py-2 text-white placeholder:text-zinc-600"
+            className="mt-1 w-full rounded-lg border border-stone-300 bg-white px-3 py-2 text-stone-900 placeholder:text-stone-400"
           />
         </label>
         <button
@@ -208,40 +208,40 @@ export default function StudioPage() {
       </form>
 
       {error && (
-        <p className="mt-6 rounded-lg border border-red-900/60 bg-red-950/40 px-4 py-3 text-sm text-red-200">
+        <p className="mt-6 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-900">
           {error}
         </p>
       )}
 
       <div className="mt-12">
-        <h2 className="text-lg font-medium text-white">Your jobs</h2>
+        <h2 className="text-lg font-medium text-stone-900">Your jobs</h2>
         {loading && (
-          <p className="mt-4 text-sm text-zinc-500">Loading…</p>
+          <p className="mt-4 text-sm text-stone-500">Loading…</p>
         )}
         <ul className="mt-6 space-y-4">
           {jobs.map((job) => (
             <li
               key={job.id}
-              className={`rounded-xl border bg-zinc-900/40 p-4 ${
+              className={`rounded-xl border bg-white/80 p-4 shadow-sm ${
                 job.finishedAt
-                  ? "border-zinc-700 opacity-90"
-                  : "border-zinc-800"
+                  ? "border-stone-300 opacity-90"
+                  : "border-stone-200"
               }`}
             >
               <div className="flex flex-wrap items-start justify-between gap-3">
                 <div>
-                  <p className="font-medium text-white">{job.title}</p>
-                  <p className="mt-1 text-xs text-zinc-500">
+                  <p className="font-medium text-stone-900">{job.title}</p>
+                  <p className="mt-1 text-xs text-stone-500">
                     {job._count.selections} selection(s) · Updated{" "}
                     {new Date(job.updatedAt).toLocaleString()}
                   </p>
                   {job.finishedAt ? (
-                    <p className="mt-2 inline-flex rounded-lg border border-emerald-800/60 bg-emerald-950/50 px-2 py-1 text-xs text-emerald-200">
+                    <p className="mt-2 inline-flex rounded-lg border border-emerald-200 bg-emerald-50 px-2 py-1 text-xs text-emerald-900">
                       Finished ·{" "}
                       {new Date(job.finishedAt).toLocaleString()}
                     </p>
                   ) : (
-                    <p className="mt-2 inline-flex rounded-lg border border-amber-900/50 bg-amber-950/30 px-2 py-1 text-xs text-amber-200/90">
+                    <p className="mt-2 inline-flex rounded-lg border border-amber-200 bg-amber-50 px-2 py-1 text-xs text-amber-900">
                       Active
                     </p>
                   )}
@@ -252,7 +252,7 @@ export default function StudioPage() {
                       type="button"
                       disabled={jobActionId !== null}
                       onClick={() => void setJobFinished(job.id, false)}
-                      className="rounded-lg border border-zinc-600 px-3 py-1.5 text-xs text-zinc-200 hover:bg-zinc-800 disabled:opacity-40"
+                      className="rounded-lg border border-stone-300 px-3 py-1.5 text-xs text-stone-800 hover:bg-stone-100 disabled:opacity-40"
                     >
                       {jobActionId === job.id ? "…" : "Reopen"}
                     </button>
@@ -261,7 +261,7 @@ export default function StudioPage() {
                       type="button"
                       disabled={jobActionId !== null}
                       onClick={() => void setJobFinished(job.id, true)}
-                      className="rounded-lg border border-emerald-700/60 bg-emerald-950/40 px-3 py-1.5 text-xs text-emerald-100 hover:bg-emerald-950/70 disabled:opacity-40"
+                      className="rounded-lg border border-emerald-300 bg-emerald-50 px-3 py-1.5 text-xs text-emerald-900 hover:bg-emerald-100 disabled:opacity-40"
                     >
                       {jobActionId === job.id ? "…" : "Mark finished"}
                     </button>
@@ -270,7 +270,7 @@ export default function StudioPage() {
                     type="button"
                     disabled={jobActionId !== null}
                     onClick={() => void deleteJob(job.id, job.title)}
-                    className="rounded-lg border border-red-900/50 px-3 py-1.5 text-xs text-red-300 hover:bg-red-950/40 disabled:opacity-40"
+                    className="rounded-lg border border-red-200 px-3 py-1.5 text-xs text-red-800 hover:bg-red-50 disabled:opacity-40"
                   >
                     {jobActionId === job.id ? "…" : "Delete"}
                   </button>
@@ -278,24 +278,24 @@ export default function StudioPage() {
               </div>
               <div className="mt-3 space-y-2">
                 <div>
-                  <p className="text-[10px] uppercase tracking-wide text-zinc-500">
+                  <p className="text-[10px] uppercase tracking-wide text-stone-500">
                     Client pick link (no Google login)
                   </p>
                   <div className="mt-1 flex flex-wrap items-center gap-2">
-                    <code className="break-all text-xs text-amber-200/90">
+                    <code className="break-all text-xs text-amber-900">
                       {job.pickUrl}
                     </code>
                     <Link
                       href={`/pick/${encodeURIComponent(job.customerToken)}`}
                       target="_blank"
                       rel="noreferrer"
-                      className="rounded border border-amber-700/50 bg-amber-950/30 px-2 py-1 text-[10px] font-medium text-amber-200/90 hover:bg-amber-950/50"
+                      className="rounded border border-amber-300 bg-amber-50 px-2 py-1 text-[10px] font-medium text-amber-900 hover:bg-amber-100"
                     >
                       Open
                     </Link>
                     <button
                       type="button"
-                      className="rounded border border-zinc-700 px-2 py-1 text-[10px] text-zinc-400 hover:bg-zinc-800"
+                      className="rounded border border-stone-300 px-2 py-1 text-[10px] text-stone-600 hover:bg-stone-100"
                       onClick={() =>
                         navigator.clipboard.writeText(job.pickUrl).catch(() => {})
                       }
@@ -305,24 +305,24 @@ export default function StudioPage() {
                   </div>
                 </div>
                 <div>
-                  <p className="text-[10px] uppercase tracking-wide text-zinc-500">
+                  <p className="text-[10px] uppercase tracking-wide text-stone-500">
                     Your board (sort picks)
                   </p>
                   <div className="mt-1 flex flex-wrap items-center gap-2">
-                    <code className="break-all text-xs text-zinc-400">
+                    <code className="break-all text-xs text-stone-700">
                       {job.photographerUrl}
                     </code>
                     <Link
                       href={`/p/${encodeURIComponent(job.slug)}`}
                       target="_blank"
                       rel="noreferrer"
-                      className="rounded border border-zinc-600 px-2 py-1 text-[10px] font-medium text-zinc-300 hover:bg-zinc-800"
+                      className="rounded border border-stone-300 px-2 py-1 text-[10px] font-medium text-stone-800 hover:bg-stone-100"
                     >
                       Open
                     </Link>
                     <button
                       type="button"
-                      className="rounded border border-zinc-700 px-2 py-1 text-[10px] text-zinc-400 hover:bg-zinc-800"
+                      className="rounded border border-stone-300 px-2 py-1 text-[10px] text-stone-600 hover:bg-stone-100"
                       onClick={() =>
                         navigator.clipboard
                           .writeText(job.photographerUrl)
@@ -338,7 +338,7 @@ export default function StudioPage() {
           ))}
         </ul>
         {!loading && jobs.length === 0 && (
-          <p className="mt-6 text-center text-sm text-zinc-500">
+          <p className="mt-6 text-center text-sm text-stone-500">
             No jobs yet. Create one above.
           </p>
         )}
