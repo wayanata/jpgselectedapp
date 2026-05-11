@@ -11,9 +11,10 @@ export async function readJsonResponse<T = unknown>(res: Response): Promise<T> {
   }
   try {
     return JSON.parse(text) as T;
-  } catch {
+  } catch (e) {
+    const detail = e instanceof Error ? e.message : "parse error";
     throw new Error(
-      `Server did not return JSON (HTTP ${res.status}). Check your connection or try again.`
+      `Server did not return valid JSON (HTTP ${res.status}): ${detail}`
     );
   }
 }

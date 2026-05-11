@@ -57,13 +57,20 @@ async function refreshAccessToken(refreshToken: string) {
     headers: { "Content-Type": "application/x-www-form-urlencoded" },
     body,
   });
+  const text = await res.text();
   if (!res.ok) {
-    const text = await res.text();
     throw new Error(
       `Google OAuth refresh failed (${res.status}): ${text.slice(0, 240)}`
     );
   }
-  return (await res.json()) as TokenRefreshResponse;
+  if (!text.trim()) {
+    throw new Error("Google OAuth refresh: empty response body");
+  }
+  try {
+    return JSON.parse(text) as TokenRefreshResponse;
+  } catch {
+    throw new Error("Google OAuth refresh: response was not JSON");
+  }
 }
 
 async function getValidAccessToken(account: GoogleAccountRow): Promise<string> {
@@ -97,11 +104,18 @@ async function driveJson<T>(url: string, accessToken: string): Promise<T> {
   const res = await fetch(url, {
     headers: { Authorization: `Bearer ${accessToken}` },
   });
+  const text = await res.text();
   if (!res.ok) {
-    const text = await res.text();
     throw new Error(`Drive API error (${res.status}): ${text.slice(0, 320)}`);
   }
-  return (await res.json()) as T;
+  if (!text.trim()) {
+    throw new Error(`Drive API: empty response (${res.status})`);
+  }
+  try {
+    return JSON.parse(text) as T;
+  } catch {
+    throw new Error(`Drive API: invalid JSON (${res.status})`);
+  }
 }
 
 async function driveFilesGetParents(fileId: string, accessToken: string) {

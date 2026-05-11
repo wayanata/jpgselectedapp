@@ -3,6 +3,7 @@
 import { signIn, signOut, useSession } from "next-auth/react";
 import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
+import { readJsonResponse } from "@/lib/read-json-response";
 
 type JobRow = {
   id: string;
@@ -31,8 +32,10 @@ export default function StudioPage() {
     setError(null);
     try {
       const res = await fetch("/api/studio/jobs");
-      if (!res.ok) throw new Error("Could not load jobs");
-      const data = await res.json();
+      const data = await readJsonResponse<{ jobs?: JobRow[]; error?: string }>(
+        res
+      );
+      if (!res.ok) throw new Error(data.error ?? "Could not load jobs");
       setJobs(data.jobs ?? []);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Error");
@@ -56,7 +59,7 @@ export default function StudioPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ title, driveFolderId }),
       });
-      const data = await res.json();
+      const data = await readJsonResponse<{ error?: string }>(res);
       if (!res.ok) throw new Error(data.error ?? "Could not create job");
       setDriveFolderId("");
       await loadJobs();
