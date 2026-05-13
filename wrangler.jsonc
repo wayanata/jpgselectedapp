@@ -5,15 +5,20 @@
   "name": "jpgselectedapp",
   "main": ".open-next/worker.js",
   "compatibility_date": "2026-05-10",
-  "compatibility_flags": ["nodejs_compat"],
-  // Prisma `engineType = "client"` loads `query_compiler_bg.wasm` from `.open-next/**/node_modules/.prisma/client/`.
-  // Without this, runtime fails: readAll '/bundle/node_modules/.prisma/client/query_compiler_bg.wasm'
+  "compatibility_flags": [
+    "nodejs_compat",
+    "no_handle_cross_request_promise_resolution"
+  ],
+  // Prisma `engineType = "client"` + wasm compiler. Keep `CompiledWasm` + `**/*.wasm`.
+  // `scripts/prune-prisma-worker-wasm.mjs` removes unused `query_engine_bg.*` after build.
   // @see https://developers.cloudflare.com/workers/wrangler/configuration/#find-additional-modules
-  "find_additional_modules": true,
+  // `find_additional_modules: true` can attach the same `query_compiler_bg.wasm` twice; Wrangler then
+  // logs "Ignoring duplicate module" and Prisma may fail at runtime: readAll '/bundle/.../query_compiler_bg.wasm'.
+  "find_additional_modules": false,
   "rules": [
     {
       "type": "CompiledWasm",
-      "globs": ["**/query_compiler_bg.wasm"],
+      "globs": ["**/*.wasm"],
       "fallthrough": true
     }
   ],

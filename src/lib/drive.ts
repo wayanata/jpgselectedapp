@@ -1,10 +1,13 @@
 import { prisma } from "@/lib/prisma";
+import { readProcessEnv } from "@/lib/read-env";
 
 function oauthCredentials() {
   const clientId =
-    process.env.GOOGLE_CLIENT_ID ?? process.env.AUTH_GOOGLE_ID ?? "";
+    readProcessEnv("GOOGLE_CLIENT_ID") ?? readProcessEnv("AUTH_GOOGLE_ID") ?? "";
   const clientSecret =
-    process.env.GOOGLE_CLIENT_SECRET ?? process.env.AUTH_GOOGLE_SECRET ?? "";
+    readProcessEnv("GOOGLE_CLIENT_SECRET") ??
+    readProcessEnv("AUTH_GOOGLE_SECRET") ??
+    "";
   if (!clientId || !clientSecret) {
     throw new Error("Missing GOOGLE_CLIENT_ID / GOOGLE_CLIENT_SECRET");
   }
@@ -54,13 +57,20 @@ async function refreshAccessToken(refreshToken: string) {
     headers: { "Content-Type": "application/x-www-form-urlencoded" },
     body,
   });
+  const text = await res.text();
   if (!res.ok) {
-    const text = await res.text();
     throw new Error(
       `Google OAuth refresh failed (${res.status}): ${text.slice(0, 240)}`
     );
   }
-  return (await res.json()) as TokenRefreshResponse;
+  if (!text.trim()) {
+    throw new Error("Google OAuth refresh: empty response body");
+  }
+  try {
+    return JSON.parse(text) as TokenRefreshResponse;
+  } catch {
+    throw new Error("Google OAuth refresh: response was not JSON");
+  }
 }
 
 async function getValidAccessToken(account: GoogleAccountRow): Promise<string> {
@@ -94,11 +104,18 @@ async function driveJson<T>(url: string, accessToken: string): Promise<T> {
   const res = await fetch(url, {
     headers: { Authorization: `Bearer ${accessToken}` },
   });
+  const text = await res.text();
   if (!res.ok) {
-    const text = await res.text();
     throw new Error(`Drive API error (${res.status}): ${text.slice(0, 320)}`);
   }
-  return (await res.json()) as T;
+  if (!text.trim()) {
+    throw new Error(`Drive API: empty response (${res.status})`);
+  }
+  try {
+    return JSON.parse(text) as T;
+  } catch {
+    throw new Error(`Drive API: invalid JSON (${res.status})`);
+  }
 }
 
 async function driveFilesGetParents(fileId: string, accessToken: string) {
@@ -198,4 +215,166 @@ export function isFolder(mimeType?: string | null) {
 
 export function isImageMime(mimeType?: string | null) {
   return !!mimeType?.startsWith("image/");
+}
+
+export async function getPhotographerDriveAccessToken(
+  photographerUserId: string
+): Promise<string> {
+  const account = await loadGoogleAccount(photographerUserId);
+  return getValidAccessToken(account);
+}
+
+/** Metadata for a Drive file (download / scope checks). */
+export async function getDriveFileMeta(
+  accessToken: string,
+  fileId: string
+): Promise<{
+  id: string;
+  name: string;
+  mimeType: string;
+  parents?: string[];
+  size?: string;
+}> {
+  const url = new URL(
+    `https://www.googleapis.com/drive/v3/files/${encodeURIComponent(fileId)}`
+  );
+  url.searchParams.set("fields", "id,name,mimeType,parents,size");
+  url.searchParams.set("supportsAllDrives", "true");
+  return driveJson(url.toString(), accessToken);
+}
+
+async function driveFileIsDirectChildOfFolder(
+  accessToken: string,
+  fileId: string,
+  parentFolderId: string
+): Promise<boolean> {
+  // Drive API v3 search `q` does not support an `id` term (using `id = '…'` returns 400
+  // "Invalid Value" for `q`). Paginate direct children of `parentFolderId` instead.
+  let pageToken: string | undefined;
+  for (let i = 0; i < 200; i++) {
+    const data = await driveFilesList(parentFolderId, pageToken, accessToken);
+    for (const f of data.files ?? []) {
+      if (f.id === fileId) return true;
+    }
+    pageToken = data.nextPageToken ?? undefined;
+    if (!pageToken) break;
+  }
+  return false;
+}
+
+/**
+ * Ensures the file lives under the job root folder (same scope as browse).
+ * When `listedFromFolderId` is set (folder the client was browsing), also accepts
+ * files that are direct children of that folder if Drive omits `parents` on
+ * metadata (shared drives / permission visibility).
+ */
+export async function assertDriveFileInJobTree(
+  accessToken: string,
+  driveFileId: string,
+  rootFolderId: string,
+  listedFromFolderId?: string | null
+): Promise<{ name: string; mimeType: string; size?: string }> {
+  const meta = await getDriveFileMeta(accessToken, driveFileId);
+  if (meta.mimeType === "application/vnd.google-apps.folder") {
+    throw new Error("Cannot download a folder");
+  }
+  const parents = meta.parents ?? [];
+  let ok = false;
+  for (const p of parents) {
+    if (p === rootFolderId) {
+      ok = true;
+      break;
+    }
+    if (await isFolderUnderRoot(accessToken, p, rootFolderId)) {
+      ok = true;
+      break;
+    }
+  }
+  if (!ok && listedFromFolderId?.trim()) {
+    const ctx = listedFromFolderId.trim();
+    if (
+      ctx === rootFolderId ||
+      (await isFolderUnderRoot(accessToken, ctx, rootFolderId))
+    ) {
+      if (await driveFileIsDirectChildOfFolder(accessToken, driveFileId, ctx)) {
+        ok = true;
+      }
+    }
+  }
+  if (!ok) {
+    throw new Error("File is outside this job’s Drive folder.");
+  }
+  return { name: meta.name, mimeType: meta.mimeType, size: meta.size };
+}
+
+/** Raw bytes for a Drive file (binary or exported Google Workspace file). */
+export async function fetchDriveFileBytes(
+  accessToken: string,
+  fileId: string,
+  mimeType: string
+): Promise<Uint8Array> {
+  if (mimeType === "application/vnd.google-apps.folder") {
+    throw new Error("Cannot download folders");
+  }
+  const googleApps =
+    mimeType.startsWith("application/vnd.google-apps.") &&
+    mimeType !== "application/vnd.google-apps.folder";
+
+  if (googleApps) {
+    let exportMime = "application/pdf";
+    if (mimeType === "application/vnd.google-apps.spreadsheet") {
+      exportMime =
+        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
+    } else if (mimeType === "application/vnd.google-apps.presentation") {
+      exportMime = "application/pdf";
+    } else if (mimeType === "application/vnd.google-apps.drawing") {
+      exportMime = "image/png";
+    } else if (mimeType === "application/vnd.google-apps.document") {
+      exportMime = "application/pdf";
+    }
+    const url = new URL(
+      `https://www.googleapis.com/drive/v3/files/${encodeURIComponent(fileId)}/export`
+    );
+    url.searchParams.set("mimeType", exportMime);
+    const res = await fetch(url.toString(), {
+      headers: { Authorization: `Bearer ${accessToken}` },
+    });
+    if (!res.ok) {
+      const t = await res.text();
+      throw new Error(
+        `Drive export failed (${res.status}): ${t.slice(0, 160)}`
+      );
+    }
+    return new Uint8Array(await res.arrayBuffer());
+  }
+
+  const url = new URL(
+    `https://www.googleapis.com/drive/v3/files/${encodeURIComponent(fileId)}`
+  );
+  url.searchParams.set("alt", "media");
+  url.searchParams.set("supportsAllDrives", "true");
+  const res = await fetch(url.toString(), {
+    headers: { Authorization: `Bearer ${accessToken}` },
+  });
+  if (!res.ok) {
+    const t = await res.text();
+    throw new Error(
+      `Drive download failed (${res.status}): ${t.slice(0, 160)}`
+    );
+  }
+  return new Uint8Array(await res.arrayBuffer());
+}
+
+/** Safe filename inside a ZIP (preserves extension when missing). */
+export function zipEntryFilename(originalName: string, mimeType: string): string {
+  const cleaned = originalName.replace(/[/\\?*:|"<>]/g, "_").trim() || "file";
+  const capped = cleaned.slice(0, 160);
+  if (/\.[a-zA-Z0-9]{2,8}$/.test(capped)) return capped;
+  if (mimeType.startsWith("image/jpeg")) return `${capped}.jpg`;
+  if (mimeType.startsWith("image/png")) return `${capped}.png`;
+  if (mimeType.startsWith("image/webp")) return `${capped}.webp`;
+  if (mimeType.startsWith("image/gif")) return `${capped}.gif`;
+  if (mimeType.startsWith("video/")) return `${capped}.mp4`;
+  if (mimeType === "application/pdf") return `${capped}.pdf`;
+  return capped;
 }

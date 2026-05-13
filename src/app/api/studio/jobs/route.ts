@@ -3,6 +3,7 @@ import { nanoid } from "nanoid";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { parseDriveFolderId } from "@/lib/drive-folder";
+import { getPublicOrigin } from "@/lib/public-origin";
 
 export async function GET() {
   const session = await auth();
@@ -18,11 +19,7 @@ export async function GET() {
     },
   });
 
-  const origin =
-    process.env.AUTH_URL ??
-    process.env.NEXTAUTH_URL ??
-    "http://localhost:3000";
-  const base = origin.replace(/\/$/, "");
+  const base = getPublicOrigin();
 
   const jobsOut = jobs.map((j) => ({
     ...j,
@@ -77,11 +74,7 @@ export async function POST(req: Request) {
     },
   });
 
-  const origin =
-    process.env.AUTH_URL ??
-    process.env.NEXTAUTH_URL ??
-    "http://localhost:3000";
-  const base = origin.replace(/\/$/, "");
+  const base = getPublicOrigin();
 
   return NextResponse.json({
     job,
