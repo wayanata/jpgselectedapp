@@ -337,11 +337,39 @@ export function JobWorkspace({ customerToken }: { customerToken: string }) {
     saveBannerRef.current?.scrollIntoView({ behavior: "smooth", block: "nearest" });
   }, [saveFeedback]);
 
+  const toggleFile = useCallback((entry: DriveEntry) => {
+    if (finishedAt) return;
+    if (isFolder(entry.mimeType)) return;
+    setSelected((prev) => {
+      const next = { ...prev };
+      if (next[entry.id]) delete next[entry.id];
+      else {
+        next[entry.id] = {
+          driveFileId: entry.id,
+          name: entry.name,
+          mimeType: entry.mimeType,
+          thumbnailLink: entry.thumbnailLink,
+          webViewLink: entry.webViewLink,
+          iconLink: entry.iconLink,
+        };
+      }
+      return next;
+    });
+  }, [finishedAt]);
+
+  const selectedCount = Object.keys(selected).length;
+  const jobLocked = !!finishedAt;
+
   useEffect(() => {
     if (!fullPreviewEntry) return;
     const onKey = (e: KeyboardEvent) => {
       if (e.key === "Escape") {
         setFullPreviewEntry(null);
+        return;
+      }
+      if (e.key === " " || e.code === "Space") {
+        e.preventDefault();
+        if (!jobLocked) toggleFile(fullPreviewEntry);
         return;
       }
       if (e.key === "ArrowLeft") {
@@ -361,30 +389,7 @@ export function JobWorkspace({ customerToken }: { customerToken: string }) {
       window.removeEventListener("keydown", onKey);
       document.body.style.overflow = prevOverflow;
     };
-  }, [fullPreviewEntry, goPreviewDelta]);
-
-  function toggleFile(entry: DriveEntry) {
-    if (finishedAt) return;
-    if (isFolder(entry.mimeType)) return;
-    setSelected((prev) => {
-      const next = { ...prev };
-      if (next[entry.id]) delete next[entry.id];
-      else {
-        next[entry.id] = {
-          driveFileId: entry.id,
-          name: entry.name,
-          mimeType: entry.mimeType,
-          thumbnailLink: entry.thumbnailLink,
-          webViewLink: entry.webViewLink,
-          iconLink: entry.iconLink,
-        };
-      }
-      return next;
-    });
-  }
-
-  const selectedCount = Object.keys(selected).length;
-  const jobLocked = !!finishedAt;
+  }, [fullPreviewEntry, goPreviewDelta, jobLocked, toggleFile]);
 
   if (loadingJob) {
     return (
@@ -408,8 +413,8 @@ export function JobWorkspace({ customerToken }: { customerToken: string }) {
           <h1 className="mt-3 text-2xl font-semibold text-stone-900">{jobTitle}</h1>
           <p className="mt-2 max-w-xl text-sm text-stone-600">
             Browse the gallery folder your photographer set up. Tap thumbnails to
-            select images, then save. Use the expand control on a thumbnail for a
-            full-screen preview — use arrow keys or on-screen buttons to move between
+            select images, then save. Open full-screen preview from the expand icon —
+            select or deselect there or from the grid, use arrows or swipe between
             photos. No Google sign-in required on your side.
           </p>
         </div>
@@ -654,7 +659,7 @@ export function JobWorkspace({ customerToken }: { customerToken: string }) {
           aria-modal="true"
           aria-label="Full image preview"
         >
-          <div className="flex shrink-0 flex-wrap items-center justify-between gap-3 text-white">
+          <div className="flex shrink-0 flex-wrap items-center gap-2 text-white sm:gap-3">
             <div className="min-w-0 flex-1">
               <p className="truncate text-sm font-medium">{fullPreviewEntry.name}</p>
               {previewGalleryEntries.length > 1 && (
@@ -665,6 +670,33 @@ export function JobWorkspace({ customerToken }: { customerToken: string }) {
                 </p>
               )}
             </div>
+            <button
+              type="button"
+              disabled={jobLocked}
+              aria-pressed={!!selected[fullPreviewEntry.id]}
+              aria-label={
+                jobLocked
+                  ? "Selection locked"
+                  : selected[fullPreviewEntry.id]
+                    ? "Remove from selection"
+                    : "Add to selection"
+              }
+              className={`shrink-0 rounded-xl px-4 py-2 text-sm font-medium transition disabled:cursor-not-allowed disabled:opacity-50 ${
+                selected[fullPreviewEntry.id]
+                  ? "bg-amber-500 text-zinc-950 hover:bg-amber-400"
+                  : "border border-white/40 bg-white/10 text-white hover:bg-white/20"
+              }`}
+              onClick={(e) => {
+                e.stopPropagation();
+                toggleFile(fullPreviewEntry);
+              }}
+            >
+              {jobLocked
+                ? "Selection locked"
+                : selected[fullPreviewEntry.id]
+                  ? "Selected ✓"
+                  : "Select"}
+            </button>
             <button
               type="button"
               className="shrink-0 rounded-lg bg-white/10 px-3 py-1.5 text-sm hover:bg-white/20"
