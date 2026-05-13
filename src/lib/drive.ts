@@ -248,26 +248,17 @@ async function driveFileIsDirectChildOfFolder(
   fileId: string,
   parentFolderId: string
 ): Promise<boolean> {
-  const esc = (s: string) => s.replace(/\\/g, "\\\\").replace(/'/g, "\\'");
+  // Drive API v3 search `q` does not support an `id` term (using `id = '…'` returns 400
+  // "Invalid Value" for `q`). Paginate direct children of `parentFolderId` instead.
   let pageToken: string | undefined;
-  do {
-    const url = new URL("https://www.googleapis.com/drive/v3/files");
-    url.searchParams.set(
-      "q",
-      `'${esc(parentFolderId)}' in parents and trashed = false`
-    );
-    url.searchParams.set("supportsAllDrives", "true");
-    url.searchParams.set("includeItemsFromAllDrives", "true");
-    url.searchParams.set("pageSize", "1000");
-    url.searchParams.set("fields", "nextPageToken, files(id)");
-    if (pageToken) url.searchParams.set("pageToken", pageToken);
-    const data = await driveJson<{
-      nextPageToken?: string;
-      files?: Array<{ id: string }>;
-    }>(url.toString(), accessToken);
-    if (data.files?.some((f) => f.id === fileId)) return true;
+  for (let i = 0; i < 200; i++) {
+    const data = await driveFilesList(parentFolderId, pageToken, accessToken);
+    for (const f of data.files ?? []) {
+      if (f.id === fileId) return true;
+    }
     pageToken = data.nextPageToken ?? undefined;
-  } while (pageToken);
+    if (!pageToken) break;
+  }
   return false;
 }
 
