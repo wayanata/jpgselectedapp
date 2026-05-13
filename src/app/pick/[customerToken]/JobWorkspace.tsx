@@ -275,6 +275,29 @@ export function JobWorkspace({ customerToken }: { customerToken: string }) {
     });
   }, [entries, imagesOnly]);
 
+  /** Images in this folder that support full preview (grid order; folders excluded). */
+  const previewGalleryEntries = useMemo(() => {
+    return visibleEntries.filter(
+      (e) => !isFolder(e.mimeType) && !!fullPreviewSrc(customerToken, e, folderId)
+    );
+  }, [visibleEntries, customerToken, folderId]);
+
+  const goPreviewDelta = useCallback(
+    (delta: number) => {
+      setFullPreviewEntry((current) => {
+        if (!current || previewGalleryEntries.length === 0) return current;
+        const i = previewGalleryEntries.findIndex((e) => e.id === current.id);
+        if (i < 0) return current;
+        const next =
+          (i + delta + previewGalleryEntries.length) % previewGalleryEntries.length;
+        return previewGalleryEntries[next];
+      });
+    },
+    [previewGalleryEntries]
+  );
+
+  const slideTouchStartX = useRef<number | null>(null);
+
   function enterFolder(c: Crumb) {
     setCrumbs((prev) => [...prev, c]);
   }
@@ -317,7 +340,19 @@ export function JobWorkspace({ customerToken }: { customerToken: string }) {
   useEffect(() => {
     if (!fullPreviewEntry) return;
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") setFullPreviewEntry(null);
+      if (e.key === "Escape") {
+        setFullPreviewEntry(null);
+        return;
+      }
+      if (e.key === "ArrowLeft") {
+        e.preventDefault();
+        goPreviewDelta(-1);
+        return;
+      }
+      if (e.key === "ArrowRight") {
+        e.preventDefault();
+        goPreviewDelta(1);
+      }
     };
     window.addEventListener("keydown", onKey);
     const prevOverflow = document.body.style.overflow;
@@ -326,7 +361,7 @@ export function JobWorkspace({ customerToken }: { customerToken: string }) {
       window.removeEventListener("keydown", onKey);
       document.body.style.overflow = prevOverflow;
     };
-  }, [fullPreviewEntry]);
+  }, [fullPreviewEntry, goPreviewDelta]);
 
   function toggleFile(entry: DriveEntry) {
     if (finishedAt) return;
@@ -374,7 +409,8 @@ export function JobWorkspace({ customerToken }: { customerToken: string }) {
           <p className="mt-2 max-w-xl text-sm text-stone-600">
             Browse the gallery folder your photographer set up. Tap thumbnails to
             select images, then save. Use the expand control on a thumbnail for a
-            full-screen preview. No Google sign-in required on your side.
+            full-screen preview — use arrow keys or on-screen buttons to move between
+            photos. No Google sign-in required on your side.
           </p>
         </div>
         <div className="flex flex-col items-end gap-2">
@@ -618,8 +654,17 @@ export function JobWorkspace({ customerToken }: { customerToken: string }) {
           aria-modal="true"
           aria-label="Full image preview"
         >
-          <div className="flex shrink-0 items-center justify-between gap-3 text-white">
-            <p className="min-w-0 truncate text-sm font-medium">{fullPreviewEntry.name}</p>
+          <div className="flex shrink-0 flex-wrap items-center justify-between gap-3 text-white">
+            <div className="min-w-0 flex-1">
+              <p className="truncate text-sm font-medium">{fullPreviewEntry.name}</p>
+              {previewGalleryEntries.length > 1 && (
+                <p className="mt-0.5 text-xs text-white/70">
+                  {previewGalleryEntries.findIndex((e) => e.id === fullPreviewEntry.id) +
+                    1}{" "}
+                  / {previewGalleryEntries.length}
+                </p>
+              )}
+            </div>
             <button
               type="button"
               className="shrink-0 rounded-lg bg-white/10 px-3 py-1.5 text-sm hover:bg-white/20"
@@ -630,9 +675,69 @@ export function JobWorkspace({ customerToken }: { customerToken: string }) {
           </div>
           <div
             role="presentation"
-            className="mt-3 flex min-h-0 flex-1 cursor-zoom-out flex-col items-center justify-center gap-4 p-2"
+            className="relative mt-3 flex min-h-0 flex-1 cursor-zoom-out flex-col items-center justify-center gap-4 p-2"
             onClick={() => setFullPreviewEntry(null)}
+            onTouchStart={(e) => {
+              slideTouchStartX.current = e.changedTouches[0]?.clientX ?? null;
+            }}
+            onTouchEnd={(e) => {
+              const start = slideTouchStartX.current;
+              slideTouchStartX.current = null;
+              if (start == null || previewGalleryEntries.length <= 1) return;
+              const end = e.changedTouches[0]?.clientX;
+              if (end == null) return;
+              const dx = end - start;
+              if (Math.abs(dx) < 48) return;
+              if (dx < 0) goPreviewDelta(1);
+              else goPreviewDelta(-1);
+            }}
           >
+            {previewGalleryEntries.length > 1 && (
+              <>
+                <button
+                  type="button"
+                  aria-label="Previous image"
+                  className="absolute left-1 top-1/2 z-[101] -translate-y-1/2 rounded-full bg-black/50 p-3 text-white backdrop-blur-sm hover:bg-black/70 md:left-3"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    goPreviewDelta(-1);
+                  }}
+                >
+                  <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    className="h-6 w-6 md:h-8 md:w-8"
+                    aria-hidden
+                  >
+                    <path d="M15 18l-6-6 6-6" />
+                  </svg>
+                </button>
+                <button
+                  type="button"
+                  aria-label="Next image"
+                  className="absolute right-1 top-1/2 z-[101] -translate-y-1/2 rounded-full bg-black/50 p-3 text-white backdrop-blur-sm hover:bg-black/70 md:right-3"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    goPreviewDelta(1);
+                  }}
+                >
+                  <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    className="h-6 w-6 md:h-8 md:w-8"
+                    aria-hidden
+                  >
+                    <path d="M9 18l6-6-6-6" />
+                  </svg>
+                </button>
+              </>
+            )}
             {fullPreviewPhase === "loading" && (
               <p className="text-sm text-white/90">Loading preview…</p>
             )}
