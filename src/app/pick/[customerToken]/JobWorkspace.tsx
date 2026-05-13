@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { fetchApiJson } from "@/lib/client-fetch-json";
 
 type DriveEntry = {
@@ -76,6 +77,95 @@ export function JobWorkspace({ customerToken }: { customerToken: string }) {
   } | null>(null);
   const saveBannerRef = useRef<HTMLDivElement>(null);
   const [fullPreviewEntry, setFullPreviewEntry] = useState<DriveEntry | null>(null);
+  const pickPreviewBlobRef = useRef<string | null>(null);
+  const [portalEl, setPortalEl] = useState<HTMLElement | null>(null);
+  const [fullPreviewBlobUrl, setFullPreviewBlobUrl] = useState<string | null>(null);
+  const [fullPreviewPhase, setFullPreviewPhase] = useState<
+    "idle" | "loading" | "ready" | "error"
+  >("idle");
+  const [fullPreviewLoadError, setFullPreviewLoadError] = useState<string | null>(null);
+
+  const fullPreviewUrl = useMemo(
+    () => (fullPreviewEntry ? fullPreviewSrc(customerToken, fullPreviewEntry) : null),
+    [fullPreviewEntry, customerToken]
+  );
+
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- document.body only exists after mount; avoids SSR/hydration mismatch for createPortal
+    setPortalEl(document.body);
+  }, []);
+
+  function revokePickPreviewBlob() {
+    if (pickPreviewBlobRef.current) {
+      URL.revokeObjectURL(pickPreviewBlobRef.current);
+      pickPreviewBlobRef.current = null;
+    }
+  }
+
+  useEffect(() => {
+    if (!fullPreviewUrl || !fullPreviewEntry) {
+      revokePickPreviewBlob();
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- reset preview UI when dialog closes
+      setFullPreviewBlobUrl(null);
+      setFullPreviewPhase("idle");
+      setFullPreviewLoadError(null);
+      return;
+    }
+
+    let cancelled = false;
+    setFullPreviewPhase("loading");
+    setFullPreviewLoadError(null);
+    revokePickPreviewBlob();
+    setFullPreviewBlobUrl(null);
+
+    void (async () => {
+      try {
+        const res = await fetch(fullPreviewUrl, {
+          cache: "no-store",
+          credentials: "same-origin",
+        });
+        const ct = res.headers.get("content-type") ?? "";
+        if (!res.ok) {
+          const text = await res.text();
+          let msg = `Could not load preview (${res.status})`;
+          try {
+            const j = JSON.parse(text) as { error?: string };
+            if (j.error) msg = j.error;
+          } catch {
+            if (text.trim()) msg = text.trim().slice(0, 200);
+          }
+          if (!cancelled) {
+            setFullPreviewPhase("error");
+            setFullPreviewLoadError(msg);
+          }
+          return;
+        }
+        if (!ct.startsWith("image/")) {
+          if (!cancelled) {
+            setFullPreviewPhase("error");
+            setFullPreviewLoadError("Preview is not an image response.");
+          }
+          return;
+        }
+        const blob = await res.blob();
+        if (cancelled) return;
+        const url = URL.createObjectURL(blob);
+        pickPreviewBlobRef.current = url;
+        setFullPreviewBlobUrl(url);
+        setFullPreviewPhase("ready");
+      } catch (e) {
+        if (!cancelled) {
+          setFullPreviewPhase("error");
+          setFullPreviewLoadError(e instanceof Error ? e.message : "Load failed");
+        }
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+      revokePickPreviewBlob();
+    };
+  }, [fullPreviewEntry, fullPreviewUrl]);
 
   const loadJob = useCallback(async () => {
     setLoadingJob(true);
@@ -254,11 +344,8 @@ export function JobWorkspace({ customerToken }: { customerToken: string }) {
     );
   }
 
-  const fullPreviewUrl = fullPreviewEntry
-    ? fullPreviewSrc(customerToken, fullPreviewEntry)
-    : null;
-
   return (
+    <>
     <div className="mx-auto max-w-6xl px-4 py-8">
       <div className="flex flex-wrap items-start justify-between gap-6">
         <div>
@@ -506,9 +593,12 @@ export function JobWorkspace({ customerToken }: { customerToken: string }) {
         </div>
       )}
 
-      {fullPreviewEntry && fullPreviewUrl && (
+    </div>
+    {portalEl &&
+      fullPreviewEntry &&
+      createPortal(
         <div
-          className="fixed inset-0 z-50 flex flex-col bg-black/85 p-4 backdrop-blur-sm"
+          className="fixed inset-0 z-[100] flex flex-col bg-black/90 p-4 backdrop-blur-sm"
           role="dialog"
           aria-modal="true"
           aria-label="Full image preview"
@@ -523,22 +613,36 @@ export function JobWorkspace({ customerToken }: { customerToken: string }) {
               Close
             </button>
           </div>
-          <button
-            type="button"
-            className="mt-3 flex min-h-0 flex-1 cursor-zoom-out items-center justify-center outline-none"
+          <div
+            role="presentation"
+            className="mt-3 flex min-h-0 flex-1 cursor-zoom-out flex-col items-center justify-center gap-4 p-2"
             onClick={() => setFullPreviewEntry(null)}
-            aria-label="Close preview"
           >
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img
-              src={fullPreviewUrl}
-              alt={fullPreviewEntry.name}
-              className="max-h-[calc(100vh-7rem)] max-w-full object-contain"
-              onClick={(e) => e.stopPropagation()}
-            />
-          </button>
-        </div>
+            {fullPreviewPhase === "loading" && (
+              <p className="text-sm text-white/90">Loading preview…</p>
+            )}
+            {fullPreviewPhase === "error" && fullPreviewLoadError && (
+              <p className="max-w-lg text-center text-sm text-red-200">{fullPreviewLoadError}</p>
+            )}
+            {fullPreviewPhase === "ready" && fullPreviewBlobUrl && (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img
+                src={fullPreviewBlobUrl}
+                alt={fullPreviewEntry.name}
+                className="max-h-[min(85vh,calc(100vh-6rem))] w-auto max-w-full object-contain"
+                onClick={(e) => e.stopPropagation()}
+                onError={() => {
+                  setFullPreviewPhase("error");
+                  setFullPreviewLoadError(
+                    "This image format may not be supported in your browser (for example some HEIC files)."
+                  );
+                }}
+              />
+            )}
+          </div>
+        </div>,
+        portalEl
       )}
-    </div>
+    </>
   );
 }
