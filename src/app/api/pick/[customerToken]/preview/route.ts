@@ -29,6 +29,7 @@ export async function GET(
     const { customerToken } = await ctx.params;
     const { searchParams } = new URL(req.url);
     const fileId = searchParams.get("fileId")?.trim();
+    const parentFolderId = searchParams.get("parentFolderId")?.trim() || null;
     if (!fileId) {
       return NextResponse.json({ error: "Missing fileId" }, { status: 400 });
     }
@@ -48,7 +49,8 @@ export async function GET(
     const meta = await assertDriveFileInJobTree(
       accessToken,
       fileId,
-      job.driveFolderId
+      job.driveFolderId,
+      parentFolderId
     );
     const contentType = inferImageMimeType(meta.name, meta.mimeType);
     if (!contentType) {

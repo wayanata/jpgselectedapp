@@ -243,13 +243,39 @@ export async function getDriveFileMeta(
   return driveJson(url.toString(), accessToken);
 }
 
+async function driveFileIsDirectChildOfFolder(
+  accessToken: string,
+  fileId: string,
+  parentFolderId: string
+): Promise<boolean> {
+  const esc = (s: string) => s.replace(/\\/g, "\\\\").replace(/'/g, "\\'");
+  const url = new URL("https://www.googleapis.com/drive/v3/files");
+  url.searchParams.set(
+    "q",
+    `'${esc(parentFolderId)}' in parents and id = '${esc(fileId)}' and trashed = false`
+  );
+  url.searchParams.set("supportsAllDrives", "true");
+  url.searchParams.set("includeItemsFromAllDrives", "true");
+  url.searchParams.set("pageSize", "1");
+  url.searchParams.set("fields", "files(id)");
+  const data = await driveJson<{ files?: Array<{ id: string }> }>(
+    url.toString(),
+    accessToken
+  );
+  return (data.files?.length ?? 0) > 0;
+}
+
 /**
  * Ensures the file lives under the job root folder (same scope as browse).
+ * When `listedFromFolderId` is set (folder the client was browsing), also accepts
+ * files that are direct children of that folder if Drive omits `parents` on
+ * metadata (shared drives / permission visibility).
  */
 export async function assertDriveFileInJobTree(
   accessToken: string,
   driveFileId: string,
-  rootFolderId: string
+  rootFolderId: string,
+  listedFromFolderId?: string | null
 ): Promise<{ name: string; mimeType: string; size?: string }> {
   const meta = await getDriveFileMeta(accessToken, driveFileId);
   if (meta.mimeType === "application/vnd.google-apps.folder") {
@@ -265,6 +291,17 @@ export async function assertDriveFileInJobTree(
     if (await isFolderUnderRoot(accessToken, p, rootFolderId)) {
       ok = true;
       break;
+    }
+  }
+  if (!ok && listedFromFolderId?.trim()) {
+    const ctx = listedFromFolderId.trim();
+    if (
+      ctx === rootFolderId ||
+      (await isFolderUnderRoot(accessToken, ctx, rootFolderId))
+    ) {
+      if (await driveFileIsDirectChildOfFolder(accessToken, driveFileId, ctx)) {
+        ok = true;
+      }
     }
   }
   if (!ok) {

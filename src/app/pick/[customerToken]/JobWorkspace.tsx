@@ -38,16 +38,30 @@ function isImage(entry: { mimeType?: string | null; name?: string | null }) {
   return /\.(jpe?g|png|webp|gif|bmp|tiff?|heic|heif|avif)$/i.test(name);
 }
 
-function entryPreviewSrc(customerToken: string, entry: DriveEntry): string | null {
+function pickPreviewQuery(entry: DriveEntry, listFolderId: string): string {
+  const qs = new URLSearchParams({ fileId: entry.id });
+  if (listFolderId) qs.set("parentFolderId", listFolderId);
+  return qs.toString();
+}
+
+function entryPreviewSrc(
+  customerToken: string,
+  entry: DriveEntry,
+  listFolderId: string
+): string | null {
   if (entry.thumbnailLink) return entry.thumbnailLink;
   if (!isImage(entry)) return null;
-  return `/api/pick/${encodeURIComponent(customerToken)}/preview?fileId=${encodeURIComponent(entry.id)}`;
+  return `/api/pick/${encodeURIComponent(customerToken)}/preview?${pickPreviewQuery(entry, listFolderId)}`;
 }
 
 /** Full-resolution image URL (always proxied; grid may still use Drive thumbnails). */
-function fullPreviewSrc(customerToken: string, entry: DriveEntry): string | null {
+function fullPreviewSrc(
+  customerToken: string,
+  entry: DriveEntry,
+  listFolderId: string
+): string | null {
   if (!isImage(entry)) return null;
-  return `/api/pick/${encodeURIComponent(customerToken)}/preview?fileId=${encodeURIComponent(entry.id)}`;
+  return `/api/pick/${encodeURIComponent(customerToken)}/preview?${pickPreviewQuery(entry, listFolderId)}`;
 }
 
 export function JobWorkspace({ customerToken }: { customerToken: string }) {
@@ -86,8 +100,9 @@ export function JobWorkspace({ customerToken }: { customerToken: string }) {
   const [fullPreviewLoadError, setFullPreviewLoadError] = useState<string | null>(null);
 
   const fullPreviewUrl = useMemo(
-    () => (fullPreviewEntry ? fullPreviewSrc(customerToken, fullPreviewEntry) : null),
-    [fullPreviewEntry, customerToken]
+    () =>
+      fullPreviewEntry ? fullPreviewSrc(customerToken, fullPreviewEntry, folderId) : null,
+    [fullPreviewEntry, customerToken, folderId]
   );
 
   useEffect(() => {
@@ -490,8 +505,8 @@ export function JobWorkspace({ customerToken }: { customerToken: string }) {
         {visibleEntries.map((entry) => {
           const folder = isFolder(entry.mimeType);
           const picked = !folder && !!selected[entry.id];
-          const previewSrc = folder ? null : entryPreviewSrc(customerToken, entry);
-          const canFullPreview = !folder && !!fullPreviewSrc(customerToken, entry);
+          const previewSrc = folder ? null : entryPreviewSrc(customerToken, entry, folderId);
+          const canFullPreview = !folder && !!fullPreviewSrc(customerToken, entry, folderId);
           return (
             <div
               key={entry.id}
