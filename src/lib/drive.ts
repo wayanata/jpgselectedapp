@@ -249,20 +249,26 @@ async function driveFileIsDirectChildOfFolder(
   parentFolderId: string
 ): Promise<boolean> {
   const esc = (s: string) => s.replace(/\\/g, "\\\\").replace(/'/g, "\\'");
-  const url = new URL("https://www.googleapis.com/drive/v3/files");
-  url.searchParams.set(
-    "q",
-    `'${esc(parentFolderId)}' in parents and id = '${esc(fileId)}' and trashed = false`
-  );
-  url.searchParams.set("supportsAllDrives", "true");
-  url.searchParams.set("includeItemsFromAllDrives", "true");
-  url.searchParams.set("pageSize", "1");
-  url.searchParams.set("fields", "files(id)");
-  const data = await driveJson<{ files?: Array<{ id: string }> }>(
-    url.toString(),
-    accessToken
-  );
-  return (data.files?.length ?? 0) > 0;
+  let pageToken: string | undefined;
+  do {
+    const url = new URL("https://www.googleapis.com/drive/v3/files");
+    url.searchParams.set(
+      "q",
+      `'${esc(parentFolderId)}' in parents and trashed = false`
+    );
+    url.searchParams.set("supportsAllDrives", "true");
+    url.searchParams.set("includeItemsFromAllDrives", "true");
+    url.searchParams.set("pageSize", "1000");
+    url.searchParams.set("fields", "nextPageToken, files(id)");
+    if (pageToken) url.searchParams.set("pageToken", pageToken);
+    const data = await driveJson<{
+      nextPageToken?: string;
+      files?: Array<{ id: string }>;
+    }>(url.toString(), accessToken);
+    if (data.files?.some((f) => f.id === fileId)) return true;
+    pageToken = data.nextPageToken ?? undefined;
+  } while (pageToken);
+  return false;
 }
 
 /**
