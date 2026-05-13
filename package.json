@@ -11,7 +11,7 @@
     "deploy:full": "npm run build:cloudflare && npm run deploy",
     "deploy:wrangler": "wrangler deploy && node scripts/rm-next-webpack-cache.mjs",
     "deploy:wrangler:full": "npm run build:cloudflare && npm run deploy:wrangler",
-    "db:deploy": "prisma migrate deploy",
+    "db:deploy": "node scripts/prisma-migrate-deploy.mjs",
     "db:deploy:retry": "node scripts/prisma-migrate-deploy-with-retry.mjs",
     "deploy:cf": "npm ci && npm run build:cloudflare && npm run deploy",
     "preview:cloudflare": "npx opennextjs-cloudflare build && npx opennextjs-cloudflare preview",

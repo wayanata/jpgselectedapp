@@ -23,7 +23,7 @@ Web app for photography workflows: **photographers** sign in with Google once, a
 4. **Environment** — copy `env.example` to `.env` and fill in:
 
    - `DATABASE_URL` — Neon **pooled** Postgres URL (`?sslmode=require`; host usually contains `-pooler`).
-   - `DIRECT_URL` — Neon **direct** URL for the same database (host usually **without** `-pooler`; required for `prisma migrate`). If you only use a single non-pooled URL locally, set `DIRECT_URL` to the same value as `DATABASE_URL`.
+   - `DIRECT_URL` — Neon **direct** URL for the same database (host usually **without** `-pooler`). Prisma uses it for **`prisma migrate`**. If you only have one URL locally, set **`DIRECT_URL` to the same value as `DATABASE_URL`**. Plain Prisma CLI (`npx prisma validate`, bare `npx prisma migrate deploy`) requires **`DIRECT_URL` to be set** in the environment; **`npm run db:deploy`** copies **`DATABASE_URL` → `DIRECT_URL`** when **`DIRECT_URL` is unset**, which is enough for Cloudflare if you only store **`DATABASE_URL`** there.
    - `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` (or `AUTH_GOOGLE_ID` / `AUTH_GOOGLE_SECRET`).
    - `AUTH_SECRET` — run `openssl rand -base64 32`.
    - `AUTH_USE_PRISMA_ADAPTER=1` — required for Postgres-backed Auth.js sessions (local + Worker); omit in CI so `next build` never opens the DB for auth.
@@ -33,7 +33,7 @@ Web app for photography workflows: **photographers** sign in with Google once, a
 
    ```bash
    npm install
-   npx prisma migrate deploy
+   npm run db:deploy
    ```
 
 6. **Run**
@@ -62,9 +62,9 @@ If you compose your own shell command for Cloudflare, always invoke the CLI with
 |------|---------|
 | Install | `npm ci` |
 | Build | **`npm run build:cloudflare`** |
-| Deploy | **`node scripts/prisma-migrate-deploy-with-retry.mjs && npm run deploy`** (or `npx prisma migrate deploy && npm run deploy`) |
+| Deploy | **`npm run db:deploy && npm run deploy`** (or **`npm run db:deploy:retry && npm run deploy`** for retries) |
 
-Run migrations once per new migration. Set both **`DATABASE_URL`** (pooled) and **`DIRECT_URL`** (Neon *direct* / non-pooler — see `env.example`) in **Workers** and in the **build/deploy** environment that runs the deploy command, same as the Worker. If `prisma migrate deploy` reports **P1001** (can’t reach database), see *Troubleshooting: P1001* below.
+Use **`npm run db:deploy`**, not bare **`npx prisma migrate deploy`**, in Workers Builds unless you also define **`DIRECT_URL`** in that environment (Prisma’s schema requires it for migrate). **`npm run db:deploy`** sets **`DIRECT_URL` from `DATABASE_URL`** when **`DIRECT_URL` is missing**. For best Neon behavior with a pooled **`DATABASE_URL`**, still add a separate **`DIRECT_URL`** secret (non-pooler host) in the dashboard. If migrate reports **P1001** (can’t reach database), see *Troubleshooting: P1001* below.
 
 **Option B — one command from a clean clone**
 
@@ -81,7 +81,7 @@ npm run deploy:cf
 **Prisma WASM / Google OAuth:** If logs show `readAll '/bundle/node_modules/.prisma/client/query_compiler_bg.wasm'` and **AdapterError**, the live Worker is usually **not** running the bundle this repo produces (or CI ignored `wrangler.jsonc`). After each deploy, the **script version id** in log entries must **change**; if it stays identical across days, you are still on an old deployment—fix Workers Builds (use this repo’s `wrangler.jsonc`, clear build cache, ensure the deploy step runs after `npm run build:cloudflare`). `npm run build:cloudflare` ends with **`scripts/assert-wrangler-prisma-wasm.mjs`**, which fails if Wrangler’s output would break Prisma on Cloudflare.
 
 1. **Wrangler config** is committed as `wrangler.jsonc` (`main`: `.open-next/worker.js`, `assets`: `.open-next/assets`). **`find_additional_modules` is set to `false`**: with `true`, Wrangler can register Prisma’s **`query_compiler_bg.wasm` twice** and log *Ignoring duplicate module*, which in production often breaks Prisma’s **`readAll('/bundle/node_modules/.prisma/client/query_compiler_bg.wasm')`** during OAuth (AdapterError). **`CompiledWasm`** with **`globs: ["**/*.wasm"]`** stays so `.wasm` imports still bundle correctly. Unused **`query_engine_bg.*`** is removed after build by **`scripts/prune-prisma-worker-wasm.mjs`**. See [Wrangler: find additional modules](https://developers.cloudflare.com/workers/wrangler/configuration/#find-additional-modules).
-2. **Variables and secrets** on the Worker: `DATABASE_URL` (Neon pooled connection string), **`DIRECT_URL`** (Neon *direct* URL for migrations — same DB, host without `-pooler`), `AUTH_USE_PRISMA_ADAPTER=1`, `AUTH_SECRET`, `AUTH_URL`, Google OAuth IDs/secrets, etc.  
+2. **Variables and secrets** on the Worker: **`DATABASE_URL`** (Postgres; Neon pooled URL recommended), optional **`DIRECT_URL`** (Neon *direct* host for migrations — omit if you rely on **`npm run db:deploy`** defaulting it from **`DATABASE_URL`**), `AUTH_USE_PRISMA_ADAPTER=1`, `AUTH_SECRET`, `AUTH_URL`, Google OAuth IDs/secrets, etc.  
    If the **Workers build** step still fails on `/api/auth`, ensure `AUTH_USE_PRISMA_ADAPTER` is **not** duplicated into **Build environment variables** (runtime-only is fine). The app reads these via runtime `process.env` so compile-time inlining does not force the Prisma adapter during `next build`.
 
 Prisma uses **`engineType = "client"`** plus **`@prisma/adapter-neon`** with **HTTP** (`PrismaNeonHTTP`) so the Worker bundle does not need the native query-engine `.node` binary (see `src/lib/prisma.ts`). **`next.config.ts`** lists **`serverExternalPackages`** for `@prisma/client` / `.prisma/client` / `@prisma/adapter-neon` so OpenNext can bundle the **workerd** build of Prisma (see [OpenNext DB how-to](https://opennext.js.org/cloudflare/howtos/db)). Use a Neon connection string; a **pooler** hostname (`-pooler` in the host) is recommended for serverless.
@@ -92,19 +92,21 @@ Prisma uses **`engineType = "client"`** plus **`@prisma/adapter-neon`** with **H
 
 The Worker build succeeded, but the **deploy** step opens a normal Postgres TCP connection from Cloudflare’s build runner to your Neon host. Typical fixes:
 
-1. **`DATABASE_URL` and `DIRECT_URL`** — Both must be present wherever **`prisma migrate deploy`** runs (Cloudflare **deploy command** environment). Copy **`DIRECT_URL`** from Neon’s **direct** connection string (host without `-pooler`). If either secret is missing or wrong, fix it in the dashboard.
+1. **Deploy command** — Use **`npm run db:deploy`** (or **`db:deploy:retry`**) so **`DIRECT_URL` is defaulted from `DATABASE_URL`** when unset. Bare **`npx prisma migrate deploy`** fails in CI with *Environment variable not found: DIRECT_URL* unless you define **`DIRECT_URL`** explicitly.
 
-2. **Neon project / branch** — Ensure the project isn’t archived or deleted and the compute isn’t stuck; open the Neon console and confirm the branch is **Active**.
+2. **`DATABASE_URL` / `DIRECT_URL`** — For Neon with a **pooled** `DATABASE_URL`, add **`DIRECT_URL`** (direct / non-pooler host) wherever migrations run if you want Neon's recommended split; otherwise **`npm run db:deploy`** alone is enough if **`DATABASE_URL`** is correct.
 
-3. **Network restrictions** — In Neon, disable strict IP allowlisting for serverless CI unless you allow Cloudflare build egress (often impractical). Default Neon allows all IPs.
+3. **Neon project / branch** — Ensure the project isn’t archived or deleted and the compute isn’t stuck; open the Neon console and confirm the branch is **Active**.
 
-4. **Timeouts / cold start** — Neon may take a few seconds to wake. Try adding query params to both URLs, for example  
+4. **Network restrictions** — In Neon, disable strict IP allowlisting for serverless CI unless you allow Cloudflare build egress (often impractical). Default Neon allows all IPs.
+
+5. **Timeouts / cold start** — Neon may take a few seconds to wake. Try adding query params to both URLs, for example  
    `?sslmode=require&connect_timeout=60`  
-   and use **`node scripts/prisma-migrate-deploy-with-retry.mjs`** so transient failures retry.
+   and use **`npm run db:deploy:retry`** so transient failures retry.
 
-5. **Sanity check outside CI** — From your laptop with the same `DATABASE_URL` / `DIRECT_URL` in the environment, run `npx prisma migrate deploy`. If that also can’t connect, the problem is the database or the connection string, not Cloudflare.
+6. **Sanity check outside CI** — From your laptop with the same `DATABASE_URL` / `DIRECT_URL` in the environment, run **`npm run db:deploy`**. If that also can’t connect, the problem is the database or the connection string, not Cloudflare.
 
-6. **Last resort** — Run **`npm run deploy`** only (no migrate in the same step) and apply migrations from a trusted network: `npx prisma migrate deploy` locally or in another CI job that can reach Neon.
+7. **Last resort** — Run **`npm run deploy`** only (no migrate in the same step) and apply migrations from a trusted network: **`npm run db:deploy`** locally or in another CI job that can reach Neon.
 
 ## Notes
 

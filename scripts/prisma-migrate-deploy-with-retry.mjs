@@ -7,6 +7,9 @@
  *   node scripts/prisma-migrate-deploy-with-retry.mjs && npm run deploy
  */
 import { spawn } from "node:child_process";
+import { applyPrismaMigrateEnvDefaults } from "./apply-prisma-migrate-env-defaults.mjs";
+
+applyPrismaMigrateEnvDefaults();
 
 const MAX_ATTEMPTS = Number.parseInt(process.env.PRISMA_MIGRATE_MAX_ATTEMPTS ?? "6", 10);
 const BASE_DELAY_MS = Number.parseInt(process.env.PRISMA_MIGRATE_RETRY_BASE_MS ?? "4000", 10);
