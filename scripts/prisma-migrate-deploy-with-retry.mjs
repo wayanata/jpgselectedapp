@@ -48,7 +48,7 @@ async function main() {
     await delay(waitMs);
   }
   console.error(
-    "[prisma-migrate-deploy-with-retry] giving up. For Neon P1002 advisory locks, try a direct (non-pooler) DATABASE_URL for migrate, or avoid parallel deploys."
+    "[prisma-migrate-deploy-with-retry] giving up. If errors mention P1001 (can't reach database): verify Neon is reachable, relax IP allowlisting, add connect_timeout=60 to DATABASE_URL/DIRECT_URL, and ensure DIRECT_URL (direct Neon host) is set for migrations. For P1002 advisory locks, avoid parallel deploys or use DIRECT_URL per Neon guidance."
   );
   process.exit(1);
 }
