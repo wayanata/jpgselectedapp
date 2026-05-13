@@ -43,6 +43,12 @@ function entryPreviewSrc(customerToken: string, entry: DriveEntry): string | nul
   return `/api/pick/${encodeURIComponent(customerToken)}/preview?fileId=${encodeURIComponent(entry.id)}`;
 }
 
+/** Full-resolution image URL (always proxied; grid may still use Drive thumbnails). */
+function fullPreviewSrc(customerToken: string, entry: DriveEntry): string | null {
+  if (!isImage(entry)) return null;
+  return `/api/pick/${encodeURIComponent(customerToken)}/preview?fileId=${encodeURIComponent(entry.id)}`;
+}
+
 export function JobWorkspace({ customerToken }: { customerToken: string }) {
   const [rootFolderId, setRootFolderId] = useState<string | null>(null);
   const [crumbs, setCrumbs] = useState<Crumb[]>([]);
@@ -69,6 +75,7 @@ export function JobWorkspace({ customerToken }: { customerToken: string }) {
     text: string;
   } | null>(null);
   const saveBannerRef = useRef<HTMLDivElement>(null);
+  const [fullPreviewEntry, setFullPreviewEntry] = useState<DriveEntry | null>(null);
 
   const loadJob = useCallback(async () => {
     setLoadingJob(true);
@@ -202,6 +209,20 @@ export function JobWorkspace({ customerToken }: { customerToken: string }) {
     saveBannerRef.current?.scrollIntoView({ behavior: "smooth", block: "nearest" });
   }, [saveFeedback]);
 
+  useEffect(() => {
+    if (!fullPreviewEntry) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setFullPreviewEntry(null);
+    };
+    window.addEventListener("keydown", onKey);
+    const prevOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      window.removeEventListener("keydown", onKey);
+      document.body.style.overflow = prevOverflow;
+    };
+  }, [fullPreviewEntry]);
+
   function toggleFile(entry: DriveEntry) {
     if (finishedAt) return;
     if (isFolder(entry.mimeType)) return;
@@ -233,6 +254,10 @@ export function JobWorkspace({ customerToken }: { customerToken: string }) {
     );
   }
 
+  const fullPreviewUrl = fullPreviewEntry
+    ? fullPreviewSrc(customerToken, fullPreviewEntry)
+    : null;
+
   return (
     <div className="mx-auto max-w-6xl px-4 py-8">
       <div className="flex flex-wrap items-start justify-between gap-6">
@@ -246,7 +271,8 @@ export function JobWorkspace({ customerToken }: { customerToken: string }) {
           <h1 className="mt-3 text-2xl font-semibold text-stone-900">{jobTitle}</h1>
           <p className="mt-2 max-w-xl text-sm text-stone-600">
             Browse the gallery folder your photographer set up. Tap thumbnails to
-            select images, then save. No Google sign-in required on your side.
+            select images, then save. Use the expand control on a thumbnail for a
+            full-screen preview. No Google sign-in required on your side.
           </p>
         </div>
         <div className="flex flex-col items-end gap-2">
@@ -378,20 +404,28 @@ export function JobWorkspace({ customerToken }: { customerToken: string }) {
           const folder = isFolder(entry.mimeType);
           const picked = !folder && !!selected[entry.id];
           const previewSrc = folder ? null : entryPreviewSrc(customerToken, entry);
+          const canFullPreview = !folder && !!fullPreviewSrc(customerToken, entry);
           return (
-            <button
+            <div
               key={entry.id}
-              type="button"
+              role="button"
+              tabIndex={0}
               onClick={() =>
                 folder
                   ? enterFolder({ id: entry.id, name: entry.name })
                   : toggleFile(entry)
               }
-              className={`group flex flex-col overflow-hidden rounded-xl border text-left transition ${
+              onKeyDown={(e) => {
+                if (e.key !== "Enter" && e.key !== " ") return;
+                e.preventDefault();
+                if (folder) enterFolder({ id: entry.id, name: entry.name });
+                else toggleFile(entry);
+              }}
+              className={`group flex flex-col overflow-hidden rounded-xl border text-left transition outline-none focus-visible:ring-2 focus-visible:ring-amber-400 ${
                 picked
                   ? "border-amber-500 ring-1 ring-amber-500/40"
                   : "border-stone-200 hover:border-stone-400"
-              } ${jobLocked && !folder ? "cursor-not-allowed opacity-90" : ""}`}
+              } ${jobLocked && !folder ? "cursor-not-allowed opacity-90" : "cursor-pointer"}`}
             >
               <div className="relative aspect-square bg-stone-100">
                 {folder ? (
@@ -409,6 +443,30 @@ export function JobWorkspace({ customerToken }: { customerToken: string }) {
                   <div className="flex h-full items-center justify-center text-xs text-stone-500">
                     No preview
                   </div>
+                )}
+                {canFullPreview && (
+                  <button
+                    type="button"
+                    aria-label="View full size"
+                    title="View full size"
+                    className="absolute left-2 top-2 flex h-8 w-8 items-center justify-center rounded-full border border-stone-300 bg-white/95 text-sm text-stone-700 shadow-sm hover:bg-white"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setFullPreviewEntry(entry);
+                    }}
+                  >
+                    <svg
+                      xmlns="http://www.w3.org/2000/svg"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="2"
+                      className="h-4 w-4"
+                      aria-hidden
+                    >
+                      <path d="M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7" />
+                    </svg>
+                  </button>
                 )}
                 {!folder && (
                   <span
@@ -430,7 +488,7 @@ export function JobWorkspace({ customerToken }: { customerToken: string }) {
                   <p className="text-[10px] text-stone-500">Open folder</p>
                 )}
               </div>
-            </button>
+            </div>
           );
         })}
       </div>
@@ -444,6 +502,40 @@ export function JobWorkspace({ customerToken }: { customerToken: string }) {
             className="rounded-xl border border-stone-300 px-6 py-2 text-sm text-stone-700 hover:bg-stone-100 disabled:opacity-50"
           >
             Load more in this folder
+          </button>
+        </div>
+      )}
+
+      {fullPreviewEntry && fullPreviewUrl && (
+        <div
+          className="fixed inset-0 z-50 flex flex-col bg-black/85 p-4 backdrop-blur-sm"
+          role="dialog"
+          aria-modal="true"
+          aria-label="Full image preview"
+        >
+          <div className="flex shrink-0 items-center justify-between gap-3 text-white">
+            <p className="min-w-0 truncate text-sm font-medium">{fullPreviewEntry.name}</p>
+            <button
+              type="button"
+              className="shrink-0 rounded-lg bg-white/10 px-3 py-1.5 text-sm hover:bg-white/20"
+              onClick={() => setFullPreviewEntry(null)}
+            >
+              Close
+            </button>
+          </div>
+          <button
+            type="button"
+            className="mt-3 flex min-h-0 flex-1 cursor-zoom-out items-center justify-center outline-none"
+            onClick={() => setFullPreviewEntry(null)}
+            aria-label="Close preview"
+          >
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src={fullPreviewUrl}
+              alt={fullPreviewEntry.name}
+              className="max-h-[calc(100vh-7rem)] max-w-full object-contain"
+              onClick={(e) => e.stopPropagation()}
+            />
           </button>
         </div>
       )}
